@@ -1,0 +1,18 @@
+# 解环核玩工具（Ring Untangle Tool）v1.4.0
+
+根据参考广告视频复刻的「解环」核心玩法工具：three.js 渲染彩色金属光泽 C 形环与套环卡扣，单文件离线版 `index.html`。
+
+## 功能
+- 手动可玩：点击/拖拽解开环，被卡住时抖动提示；随机关卡 + 可解性校验
+- 自动通关：按参考视频节奏模拟手指（hand.png，可替换）
+- 设置面板：画布、关卡、建模、材质与灯光（金属度/清漆/柔光箱宽度等）、动画、音效、手指、导出参数，localStorage 持久化（含版本迁移，当前 v6）
+- 录屏导出（手动开始）、AE 导出（timeline.json + .jsx + 素材 + 音频 ZIP）、3D 导出（glTF）、H5 试玩导出（多渠道、机型尺寸预设、无手指、默认不自动播放）
+- 超采样抗锯齿（SSAA）消除边缘黑色锯齿
+
+## 本地运行
+```bash
+npm install          # 需要 three、esbuild、playwright-core
+npm run build        # 生成 index.html
+python3 -m http.server 8765   # 打开 http://localhost:8765/
+npm test             # 无头浏览器自动测试
+```

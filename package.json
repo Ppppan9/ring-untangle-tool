@@ -1,0 +1,8 @@
+{
+  "name": "ring-untangle-tool",
+  "version": "1.0.0",
+  "description": "解环核玩工具（单文件离线版，three.js）",
+  "type": "module",
+  "private": true,
+  "scripts": { "build": "node build.mjs", "test": "node test/play.mjs", "test:ae": "node test/ae-export.mjs", "test:h5": "node test/h5-export.mjs", "shots": "node test/shots.mjs" }
+}
