@@ -1,6 +1,6 @@
 // 解环核玩工具 —— 设置定义（中文标签），版本号 + 迁移。通用分组 / 键名按 game-toolkit-standard/TOOLKIT_STANDARD.md
 import { h5DeviceSelectOptions } from './h5/index.js';
-export const APP_VERSION = '1.13.0';
+export const APP_VERSION = '1.14.0';
 export const SETTINGS_VERSION = 14;
 export const STORE_KEY = 'ringUntangleTool.settings';
 export const APP_ID = 'ring-untangle-tool';
@@ -172,6 +172,7 @@ export const GROUPS = [
     ['gripLimit', '最多同时被几个扣夹住仍可取下（0 = 不限，参考）', 'range', 0, 0, 4, 1],
     ['dragFollow', '拖动时环跟随旋转的比例', 'range', 0.6, 0, 1.5, 0.01],
     ['dragMaxDeg', '拖动最大旋转(°)', 'range', 32, 0, 90, 1],
+    ['exitDeg', '脱出所需旋转(°，环绕扣子转够才能取下；单击不脱出)', 'range', 24, 0, 90, 1],
     ['blockMaxDeg', '被卡住时最大旋转(°)', 'range', 7, 0, 30, 0.5],
     ['flyDur', '取下飞出时长(ms)', 'range', 260, 100, 2000, 10],
     ['flyDist', '飞出距离(px)', 'range', 220, 0, 600, 5],

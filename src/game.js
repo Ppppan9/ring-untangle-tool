@@ -216,13 +216,15 @@ export class Game {
     if (this.lt && D.rel) return { ok: true, i: D.i, rel: true }; // 本次旋转只脱开了扣子：停在当前角度
     if (this.lt && this.L.rings[D.i].ch === 'C' && this.isFree(D.i) && this.grips(D.i).length) return { ok: true, i: D.i, rel: false };
     if (this.lt && this.isFree(D.i)) { r.slot = this.slotOf(D.i); r.state = 'fly'; r.fly = { t0: this.t, dur: this.S.letterFlyDur / 1000, slot: r.slot, sd: this.slideDir(D.i) }; this.events.push({ type: 'pop', i: D.i }); return { ok: true, i: D.i }; }
-    if (D.free && this.isFree(D.i)) {
+    const needRot = !this.lt && D.free && this.grips(D.i).length && Math.abs(r.rot) < (this.S.exitDeg ?? 24); // 参考：必须绕扣子转到位（缺口滑过扣子）才能脱出；单击/转不够只晃动
+    if (D.free && this.isFree(D.i) && !needRot) {
       const b = this.L.rings[D.i], f = this.xf(D.i); let dx = f.x - r.px, dy = f.y - r.py;
       { const c = this.centroid(); dx = b.x - c[0]; dy = b.y - c[1]; } // 参考：沿远离画面中心方向弹出
       const n = Math.hypot(dx, dy) || 1, sgn = r.rot >= 0 ? 1 : -1;
       r.state = 'fly'; r.fly = { t0: this.t, dur: this.S.flyDur / 1000, dx: dx / n, dy: dy / n, spin: this.S.flySpin * sgn };
       this.events.push({ type: 'pop', i: D.i }); return { ok: true, i: D.i };
     }
+    if (needRot) { r.rot = 0; r.shake = { t0: this.t, dur: this.S.shakeDur / 1000 }; this.events.push({ type: 'norot', i: D.i }); return { ok: false, i: D.i, needRot: true }; }
     r.rot = this.lt ? D.base : 0; r.shake = { t0: this.t, dur: this.S.shakeDur / 1000 };
     if (this.S.blockFlash) for (const k of this.blockers(D.i)) this.clipFlash[k] = this.t;
     this.events.push({ type: 'block', i: D.i }); return { ok: false, i: D.i };
