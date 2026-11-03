@@ -1,7 +1,7 @@
 // 字母编辑器：输入字母生成 → 长杆拖到 H 上（吸附预览）→ 拖 C 靠近套管（穿入预览）→ 松手穿入 → 可解校验 → 保存试玩
 import { openPage, advance, shot, ok } from './lib.mjs';
 const { b, p, errs } = await openPage();
-await p.evaluate(() => { __game.setMany({ theme: 'letters', word: 'CAKE', wordSeed: 0, canvasW: 720, canvasH: 1280 }); __game.openEditor(); __game.editLevel.rings = []; __game.editLevel.clips = []; __game.editLevel.word = 'HI'; });
+await p.evaluate((ST) => { __game.setMany({ theme: 'letters', word: 'CAKE', wordSeed: 0, canvasW: 720, canvasH: 1280, ...ST }); __game.openEditor(); __game.editLevel.rings = []; __game.editLevel.clips = []; __game.editLevel.word = 'HI'; }, JSON.parse(process.env.STYLE || '{}'));
 await p.evaluate(() => { document.getElementById('edCh').value = 'HI'; document.getElementById('edGen').click(); });
 const lv = await p.evaluate(() => __game.editLevel.rings.map(r => [r.ch, r.x, r.y]));
 ok(lv.length === 2 && lv[0][0] === 'H' && lv[1][0] === 'I', '编辑器：输入 HI 生成 2 个字母 ' + JSON.stringify(lv));

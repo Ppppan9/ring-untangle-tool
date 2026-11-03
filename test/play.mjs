@@ -69,13 +69,16 @@ await p.evaluate(() => { __game.setMany({ word: 'CAKE', wordSeed: 0, autoMode: '
 await grab(() => __game.doExportAE(), '字母主题 CAKE AE 导出（白模）');
 await grab(() => __game.doExportH5(), '字母主题 CAKE H5 导出（白模）');
 await grab(() => __game.doExport3D(), '字母主题 CAKE 3D 导出（白模）');
-// 6) 粗管套筒模型风格
-await p.evaluate(() => { __game.setMany({ letterModel: 'thickSleeve', whiteModel: false, word: 'CAKE', wordSeed: 0, autoMode: 'ref' }); __game.startAuto(); });
-{ let lr = null; for (let s2 = 0; s2 < 30; s2++) { lr = await advance(p, 1); if (lr.win != null) break; } ok(lr.win != null, `粗管套筒：CAKE 参考序列自动通关 ${lr.t.toFixed(1)} 秒`); }
-for (const w of ['MONEY', 'BRIGHTS']) { const is = await p.evaluate(w => { __game.setMany({ word: w, wordSeed: 3, autoMode: 'solver' }); return __game.layoutIssues(__game.L, 20); }, w); ok(is.overlap === 0, `粗管套筒：${w} 布局无字母重叠（杆穿字 ${is.rodHit} / 交叉 ${is.cross}）`);
-  await p.evaluate(() => __game.startAuto()); let lr = null; for (let s2 = 0; s2 < 60; s2++) { lr = await advance(p, 1); if (lr.win != null) break; } ok(lr.win != null, `粗管套筒：${w} 求解自动通关 ${lr.t.toFixed(1)} 秒`); }
-await p.evaluate(() => { __game.setMany({ word: 'CAKE', wordSeed: 0, autoMode: 'ref', whiteModel: true }); __game.startAuto(); __game.aeStart(); }); await advance(p, 12); await p.evaluate(() => __game.aeStop());
-await grab(() => __game.doExportH5(), '粗管套筒 CAKE H5 导出（白模）'); await grab(() => __game.doExport3D(), '粗管套筒 CAKE 3D 导出（白模）');
-await p.evaluate(() => __game.setMany({ theme: 'rings', whiteModel: false, letterModel: 'beadRod' }));
+// 6) 字母风格 × 连接件风格 组合
+for (const [ls, cs] of [['thick', 'collar'], ['candy', 'clasp'], ['ref', 'clasp'], ['candy', 'beadRod'], ['thick', 'clasp']]) {
+  const tube = { ref: 9.5, thick: 20, candy: 17 }[ls];
+  await p.evaluate(([ls, cs]) => { __game.setMany({ letterStyle: ls, connStyle: cs, whiteModel: false, word: 'CAKE', wordSeed: 0, autoMode: 'ref' }); __game.startAuto(); }, [ls, cs]);
+  { let lr = null; for (let s2 = 0; s2 < 30; s2++) { lr = await advance(p, 1); if (lr.win != null) break; } ok(lr.win != null, `${ls}+${cs}：CAKE 参考序列自动通关 ${lr.t.toFixed(1)} 秒`); }
+  const w = 'MONEY', is = await p.evaluate(([w, t]) => { __game.setMany({ word: w, wordSeed: 3, autoMode: 'solver' }); return __game.layoutIssues(__game.L, t); }, [w, tube]); ok(is.overlap === 0, `${ls}+${cs}：${w} 布局无字母重叠（杆穿字 ${is.rodHit} / 交叉 ${is.cross}）`);
+  await p.evaluate(() => __game.startAuto()); let lr = null; for (let s2 = 0; s2 < 60; s2++) { lr = await advance(p, 1); if (lr.win != null) break; } ok(lr.win != null, `${ls}+${cs}：${w} 求解自动通关 ${lr.t.toFixed(1)} 秒`);
+}
+await p.evaluate(() => { __game.setMany({ letterStyle: 'candy', connStyle: 'clasp', word: 'CAKE', wordSeed: 0, autoMode: 'ref', whiteModel: true }); __game.startAuto(); __game.aeStart(); }); await advance(p, 12); await p.evaluate(() => __game.aeStop());
+await grab(() => __game.doExportAE(), '糖果+方扣 CAKE AE 导出（白模）'); await grab(() => __game.doExportH5(), '糖果+方扣 CAKE H5 导出（白模）'); await grab(() => __game.doExport3D(), '糖果+方扣 CAKE 3D 导出（白模）');
+await p.evaluate(() => __game.setMany({ theme: 'rings', whiteModel: false, letterStyle: 'ref', connStyle: 'beadRod' }));
 ok(errs.length === 0, '全程无 console/page error ' + JSON.stringify(errs));
 await b.close();
