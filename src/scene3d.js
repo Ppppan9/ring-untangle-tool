@@ -113,7 +113,7 @@ export class Scene3D {
       const rm = new THREE.MeshPhysicalMaterial({ color: W ? wc : S.rodColor, roughness: 0.3, metalness: 0.5, clearcoat: 0.6, envMapIntensity: 0.9 }); go.userData.mats.push(rm);
       const tg = glyphNearest(glyphPolysS(gb, gb.rot || 0), c.x - gb.x, c.y - gb.y), qo = glyphNearest(glyphPolysS(o, o.rot || 0), (c.rx ?? c.x) - o.x, (c.ry ?? c.y) - o.y);
       if (clasp) { // 同色方扣细杆：主人同色细杆从主人笔画伸出，末端圆角方扣包住被扣字母笔画
-        const cm = go.userData.mats[0].clone(); if (!W) { cm.color.lerp(new THREE.Color('#ffffff'), S.claspLight); cm.emissive = cm.color.clone(); } cm.userData.ei = cm.emissiveIntensity; go.userData.mats.push(cm); this.clipMeshes[k] = cm;
+        const cm = go.userData.mats[0].clone(); if (!W) { const v = S.claspLight; if (v >= 0) cm.color.lerp(new THREE.Color('#ffffff'), v); else cm.color.offsetHSL(0, 0, v * 0.5).multiplyScalar(1 + v); cm.emissive = cm.color.clone(); } // 参考：扣子 = 主人颜色的深色版 cm.userData.ei = cm.emissiveIntensity; go.userData.mats.push(cm); this.clipMeshes[k] = cm;
         const h = r * S.claspR, box = new RoundedBoxGeometry(h * 2, r * S.claspLen, h * 2, 4, Math.min(h, r * S.claspLen / 2) * 0.45), rodT = new THREE.CylinderGeometry(r * S.claspRodR, r * S.claspRodR, 1, 20);
         const bx = c.x - o.x, by = -(c.y - o.y), ax = qo.x, ay = -qo.y, m = new THREE.Mesh(box, cm); m.position.set(bx, by, 0); m.rotation.z = -tg.ang - Math.PI / 2; m.castShadow = m.receiveShadow = true; go.add(m);
         const dx = ax - bx, dy = ay - by, len = Math.hypot(dx, dy); if (len > 1) { const st = new THREE.Mesh(rodT, cm); st.scale.y = len; st.position.set((ax + bx) / 2, (ay + by) / 2, 0); st.rotation.z = Math.atan2(dy, dx) - Math.PI / 2; st.castShadow = true; go.add(st); }
