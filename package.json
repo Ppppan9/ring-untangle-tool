@@ -1,6 +1,6 @@
 {
   "name": "ring-untangle-tool",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "解环核玩工具（单文件离线版，three.js）",
   "type": "module",
   "private": true,

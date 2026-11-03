@@ -180,6 +180,7 @@
         if (src.asset) {
             if (!items[src.asset]) { warnings.push("缺少素材，跳过图层：" + L.name); return null; }
             layer = comp.layers.add(items[src.asset]);
+            if (/^ring_/.test(src.asset)) { try { layer.motionBlur = true; comp.motionBlur = true; comp.shutterAngle = 270; comp.motionBlurSamplesPerFrame = 16; } catch (eMB) {} } // 弹出动态模糊（参考）
         } else if (src.comp) {
             layer = comp.layers.add(comps[src.comp]);
         } else if (src.solid) {

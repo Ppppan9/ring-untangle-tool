@@ -1,9 +1,10 @@
 // 解环核玩工具 —— 主程序：游戏循环 / 3D 渲染合成 / 输入（按住拖动环）/ 自动通关（参考序列 + 求解）/ 关卡编辑器 / 录制 / AE·3D·H5 导出 / 设置面板
 import { GROUPS, DEFS, loadSettings, saveSettings, migrate, exportJSON, APP_ID, APP_VERSION } from './settings.js';
-import { Game, levelFromSettings, solveLevel, normalizeLevel, randomLevel, REF_LEVEL, COLORS, COLOR_ZH, circleX } from './game.js';
+import { Game, levelKey, LETTER_LEVEL, levelFromSettings, solveLevel, normalizeLevel, randomLevel, REF_LEVEL, COLORS, COLOR_ZH, circleX } from './game.js';
 import { Scene3D, colorOf } from './scene3d.js';
+import { glyphPolys, glyphNearest } from './glyphs.js';
 import { Sfx } from './audio.js';
-import { REF_SEQ, REF_HAND0 } from './refseq.js';
+import { REF_SEQ, REF_HAND0, LETTER_SEQ, LETTER_HAND0 } from './refseq.js';
 import { createAERecorder } from './ae/recorder.js';
 import { makeZip } from './ae/zip.js';
 import { DEFAULT_HAND } from './default_hand.js';
@@ -31,8 +32,9 @@ const bs = () => S.boardScale;
 const BX = x => BCX + (x - BCX) * bs() + S.boardX, BY = y => BCY + (y - BCY) * bs() + S.boardY;
 const IBX = x => (x - S.boardX - BCX) / bs() + BCX, IBY = y => (y - S.boardY - BCY) / bs() + BCY;
 const geoS = () => ({ ...S, ringR: S.ringR * bs(), tubeR: S.tubeR * bs(), clipSize: S.clipSize * bs() });
-function placeLevel(lv) { return { name: lv.name, rings: lv.rings.map(r => ({ ...r, x: BX(r.x), y: BY(r.y) })), clips: lv.clips.map(c => ({ ...c, x: BX(c.x), y: BY(c.y) })) }; }
-const isRefLevel = () => !(S.levelJson && S.levelJson.trim());
+function placeLevel(lv) { return { name: lv.name, rings: lv.rings.map(r => ({ ...r, x: BX(r.x), y: BY(r.y) })), clips: lv.clips.map(c => ({ ...c, x: BX(c.x), y: BY(c.y), ...(c.rx != null ? { rx: BX(c.rx), ry: BY(c.ry) } : {}) })), theme: lv.theme, word: lv.word }; }
+const isRefLevel = () => { const j = S[levelKey(S)]; return !(j && j.trim()); };
+const LT = () => !!(L && L.theme === 'letters');
 function rebuild() {
   if (cv.width !== S.canvasW || cv.height !== S.canvasH) { cv.width = S.canvasW; cv.height = S.canvasH; }
   if (!document.documentElement.classList.contains('h5-playable')) cv.style.aspectRatio = `${S.canvasW}/${S.canvasH}`;
@@ -41,7 +43,7 @@ function rebuild() {
 function newGame(lv = null) {
   stopAuto(); rebuild(); level = lv || levelFromSettings(S); L = placeLevel(level);
   G = new Game(L, S); lastT = now(); acc = 0; ripples.length = 0; winSfx = false; pd = null;
-  hand.x = REF_HAND0.x; hand.y = REF_HAND0.y; window.__finished = false; finishStopT = null;
+  { const h0 = LT() ? LETTER_HAND0 : REF_HAND0; hand.x = h0.x; hand.y = h0.y; } window.__finished = false; finishStopT = null;
   const sv = solveLevel(level, S.gripLimit); G.solvable = sv.solvable;
   status(`v${APP_VERSION} · ${level.name || '自定义关卡'} · ${level.rings.length} 个环 · ${level.clips.length} 个扣 · ${sv.solvable ? '可全部解开' : `⚠ 不可解（${sv.stuck.length} 个环卡死）`}`);
 }
@@ -58,6 +60,7 @@ function handleEvents() {
     if (e.type === 'grab') sfx.play('grab', S);
     else if (e.type === 'pop') sfx.play('pop', S);
     else if (e.type === 'block') sfx.play('block', S);
+    else if (e.type === 'release') sfx.play('grab', S);
     else if (e.type === 'win') { window.__finished = true; status(`全部解开！用时 ${G.t.toFixed(1)} 秒`); onFinish(); }
   }
   G.events.length = 0;
@@ -69,14 +72,14 @@ let rngS = 1; const rnd = (a = 0, b = 1) => { rngS = (rngS * 16807) % 2147483647
 function startAuto() {
   newGame(level); rngS = 12345;
   auto = { mode: S.autoMode === 'ref' && isRefLevel() && S.boardScale === 1 && S.boardX === 0 && S.boardY === 0 && S.gripLimit === 0 ? 'ref' : 'solver', t0: G.t, idx: 0, plan: null, lastEnd: 0 };
-  hand.visible = true; hand.x = REF_HAND0.x; hand.y = REF_HAND0.y;
+  hand.visible = true; { const h0 = LT() ? LETTER_HAND0 : REF_HAND0; hand.x = h0.x; hand.y = h0.y; }
   if (auto.mode !== 'ref') { hand.x = view.x0 + view.w * 0.78; hand.y = view.y0 + view.h * 0.86; }
   updAutoBtn(); sfx.resume();
   if (S.autoRec && !rec) startRec(); // 默认关：自动通关不会自动开始录制
 }
 function stopAuto() { if (!auto) return; if (G && G.drag) G.release(); auto = null; hand.visible = false; hand.follow = null; hand.pressT0 = null; updAutoBtn(); }
 function autoSolve() { if (auto) { stopAuto(); return; } startAuto(); }
-function grabPoint(i, ga) { const f = G.xf(i), R = S.ringR * bs(); return [f.x + R * Math.cos(ga * Math.PI / 180), f.y + R * Math.sin(ga * Math.PI / 180)]; }
+function grabPoint(i, ga) { const f = G.xf(i), R = LT() ? (L.rings[i].ch === 'C' ? 0.42 : 0.3) * (L.rings[i].h || 140) * bs() : S.ringR * bs(); return [f.x + R * Math.cos(ga * Math.PI / 180), f.y + R * Math.sin(ga * Math.PI / 180)]; }
 function bestGrab(i) { // 求解模式：抓离扣子最远、靠近手的位置
   const b = L.rings[i], gr = G.grips(i); let best = 90, bd = -1e9;
   for (let a = -180; a < 180; a += 15) { const p = [b.x + Math.cos(a * Math.PI / 180), b.y + Math.sin(a * Math.PI / 180)], gap = ((a - b.gap + 540) % 360) - 180; if (Math.abs(gap) < S.gapDeg * 0.7) continue; let s = gr.length ? Math.min(...gr.map(c => Math.hypot(c.x - b.x - Math.cos(a * Math.PI / 180) * S.ringR, c.y - b.y - Math.sin(a * Math.PI / 180) * S.ringR))) : 0; s += Math.sin(a * Math.PI / 180) * 20 + Math.cos(a * Math.PI / 180) * 30; void p; if (s > bd) { bd = s; best = a; } }
@@ -87,16 +90,17 @@ function directorStep(h) {
   if (G.winT != null) return;
   if (!auto.plan) {
     let st = null;
-    if (auto.mode === 'ref') { if (auto.idx < REF_SEQ.length) { const q = REF_SEQ[auto.idx++]; st = { ...q, at: q.t / sp, d: q.d / sp }; } else auto.mode = 'solver'; }
+    if (auto.mode === 'ref') { const SEQ = LT() ? LETTER_SEQ : REF_SEQ; if (auto.idx < SEQ.length) { const q = SEQ[auto.idx++]; st = { ...q, at: q.t / sp, d: q.d / sp }; } else auto.mode = 'solver'; }
     if (auto.mode === 'solver') {
       if (G.rings.some(r => r.state === 'fly')) return;
       const free = G.freeIds(); if (!free.length) { status('⚠ 没有可取下的环（关卡卡死）'); stopAuto(); return; }
       const i = free.slice().sort((a, b) => Math.hypot(L.rings[a].x - hand.x, L.rings[a].y - hand.y) - Math.hypot(L.rings[b].x - hand.x, L.rings[b].y - hand.y))[0];
       const gap = (rnd(S.delayMin, S.delayMax) + (rnd() < S.thinkChance ? rnd(0, S.thinkMax) : 0)) / 1000 / sp;
       const mv = rnd(S.moveMin, S.moveMax) / 1000 / sp;
-      st = { i, ga: bestGrab(i), dir: rnd() < 0.5 ? 1 : -1, at: Math.max(tau + mv, auto.lastEnd + gap + mv), d: S.dragDur / 1000 / sp };
+      if (LT()) { const b = L.rings[i]; st = { i, ga: b.ch === 'C' ? 90 : -60, dir: 1, sw: b.ch === 'C' && G.grips(i).length ? 300 : 20, at: Math.max(tau + mv, auto.lastEnd + gap + mv), d: (b.ch === 'C' && G.grips(i).length ? 2.4 : 0.35) / sp }; }
+      else st = { i, ga: bestGrab(i), dir: rnd() < 0.5 ? 1 : -1, at: Math.max(tau + mv, auto.lastEnd + gap + mv), d: S.dragDur / 1000 / sp };
     }
-    const [gx, gy] = grabPoint(st.i, st.ga), j = auto.mode === 'solver' ? [(rnd() - 0.5) * S.jitter, (rnd() - 0.5) * S.jitter] : [0, 0];
+    const [gx, gy] = LT() && auto.mode === 'ref' ? grabPoint(st.i, st.ga) : grabPoint(st.i, st.ga), j = auto.mode === 'solver' ? [(rnd() - 0.5) * S.jitter, (rnd() - 0.5) * S.jitter] : [0, 0];
     auto.plan = { ...st, from: [hand.x, hand.y], tgt: [gx + j[0], gy + j[1]], moveT0: Math.max(tau, st.at - Math.max(0.15 / sp, Math.min(st.at - tau, (S.moveMax / 1000) / sp * 1.4))), pressed: false, bend: [(rnd() - 0.5) * 60, 10 + rnd() * 30] };
   }
   const P = auto.plan;
@@ -107,7 +111,7 @@ function directorStep(h) {
       if (G.rings[P.i].state !== 'idle') { auto.plan = null; return; }
       G.press(P.i, hand.x, hand.y); P.pressed = true; P.t1 = tau; hand.follow = 1; if (S.pressEnabled) hand.pressT0 = G.t;
       const r = G.rings[P.i]; P.piv = [r.px, r.py]; P.a0 = Math.atan2(hand.y - r.py, hand.x - r.px); P.rr = Math.hypot(hand.x - r.px, hand.y - r.py);
-      P.sweep = (G.drag.free ? S.dragMaxDeg : S.blockMaxDeg * 2.2) / Math.max(0.05, S.dragFollow) * Math.PI / 180 * P.dir;
+      P.sweep = P.sw != null ? P.sw * Math.PI / 180 * P.dir : (G.drag.free ? S.dragMaxDeg : S.blockMaxDeg * 2.2) / Math.max(0.05, S.dragFollow) * Math.PI / 180 * P.dir;
     }
     return;
   }
@@ -123,14 +127,24 @@ function updAutoBtn() { const b = document.getElementById('btnAuto'); if (b) { b
 function xfs() { return G.rings.map((r, i) => r.state === 'gone' ? null : G.xf(i)); }
 function flashes() { return G.clipFlash.map(t0 => { const d = G.t - t0; return d >= 0 && d < 0.5 ? Math.max(0, Math.sin(d / 0.5 * Math.PI * 3)) * (1 - d / 0.5) : 0; }); }
 function drawBg(g) {
-  const gr = g.createLinearGradient(0, 0, 0, cv.height); gr.addColorStop(0, S.bgTop); gr.addColorStop(1, S.bgBottom); g.fillStyle = gr; g.fillRect(0, 0, cv.width, cv.height);
+  const gr = g.createLinearGradient(0, 0, 0, cv.height); gr.addColorStop(0, LT() ? S.lbgTop : S.bgTop); gr.addColorStop(1, LT() ? S.lbgBottom : S.bgBottom); g.fillStyle = gr; g.fillRect(0, 0, cv.width, cv.height);
   const rg = g.createRadialGradient(cv.width * 0.55, cv.height * 0.55, 10, cv.width * 0.55, cv.height * 0.55, cv.height * 0.6); rg.addColorStop(0, 'rgba(255,255,255,0.10)'); rg.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = rg; g.fillRect(0, 0, cv.width, cv.height);
 }
+function drawSlots(g) { // 字母主题：顶部单词槽（参考：浅色圆角底板 + 灰色圆角格，取下的字母飞入后显示为彩色字）
+  if (!LT() || !L.word) return; g.setTransform(K, 0, 0, K, -view.x0 * K, -view.y0 * K);
+  const n = L.word.length, w = S.slotW, gp = S.slotGap, x0 = 360 - (n * w + (n - 1) * gp) / 2, y = S.slotY, rr = (x, y, w, h, r) => { g.beginPath(); g.roundRect ? g.roundRect(x, y, w, h, r) : g.rect(x, y, w, h); };
+  g.fillStyle = 'rgba(235,240,250,0.75)'; g.strokeStyle = 'rgba(255,255,255,0.9)'; g.lineWidth = 3; rr(x0 - 12, y - 10, n * w + (n - 1) * gp + 24, S.slotH + 20, 14); g.fill(); g.stroke();
+  for (let k = 0; k < n; k++) { g.fillStyle = '#d6dbe4'; rr(x0 + k * (w + gp), y, w, S.slotH, 10); g.fill(); }
+  g.font = `900 ${Math.round(S.slotH * 0.62)}px "Arial Rounded MT Bold","Arial Black",sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+  G.rings.forEach((r, i) => { if (r.state === 'gone' && r.slot != null) { g.fillStyle = S.whiteModel ? '#cfcfcf' : colorOf(S, L.rings[i].c); g.fillText(L.rings[i].ch, x0 + r.slot * (w + gp) + w / 2, y + S.slotH / 2 + 2); } });
+  g.setTransform(1, 0, 0, 1, 0, 0);
+}
 function drawTitle(g) {
+  if (LT()) { if (S.lvTitle) { g.setTransform(K, 0, 0, K, -view.x0 * K, -view.y0 * K); g.fillStyle = '#2a3346'; g.font = `800 ${S.lvTitleSize}px "Arial Rounded MT Bold","Arial",sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(S.lvTitle, 360, S.lvTitleY); g.setTransform(1, 0, 0, 1, 0, 0); } return drawSlots(g); }
   if (!S.titleShow) return; g.setTransform(K, 0, 0, K, -view.x0 * K, -view.y0 * K);
   g.fillStyle = S.titleBar; g.fillRect(view.x0 - 2, S.titleY, view.w + 4, S.titleH);
   g.fillStyle = S.titleColor; g.font = `900 ${S.titleSize}px "Arial Black","Arial Rounded MT Bold","Noto Sans CJK SC",sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.fillText(S.titleText, DW / 2, S.titleY + S.titleH / 2 + S.titleSize * 0.04); g.setTransform(1, 0, 0, 1, 0, 0);
+  g.translate(DW / 2, S.titleY + S.titleH / 2 + S.titleSize * 0.04 + (S.titleDY || 0)); g.scale(S.titleSX || 1, 1); g.fillText(S.titleText, 0, 0); g.setTransform(1, 0, 0, 1, 0, 0);
 }
 const _tmp = {}; const tmpC = (k, w, h) => { let c = _tmp[k]; if (!c) c = _tmp[k] = document.createElement('canvas'); if (c.width !== w || c.height !== h) { c.width = w; c.height = h; } return c; };
 let grainTile = null;
@@ -150,9 +164,21 @@ function drawRings(g, only = -1, X = null) {
     g.drawImage(sh, 0, 0); g.drawImage(bl, 0, 0);
   } else g.drawImage(c3, 0, 0, W, H);
 }
+// 弹出动态模糊：飞行中的环从主渲染剔除，按快门时间多次采样平均叠加（参考视频飞出有明显拖影）
+function drawRingsMB(g) {
+  const fly = G.rings.filter(r => r.state === 'fly' && S.mblur > 0).map(r => r.i);
+  if (!fly.length) return drawRings(g);
+  const X = xfs(); fly.forEach(i => X[i] = null); drawRings(g, -1, X);
+  const N = Math.max(2, S.mblurN | 0), t0 = G.t, W = cv.width, H = cv.height, acc = tmpC('mb', W, H), ag = acc.getContext('2d'); ag.globalCompositeOperation = 'copy';
+  for (let k = 0; k < N; k++) {
+    G.t = t0 - S.mblur / 1000 * k / (N - 1); const Y = G.rings.map(() => null); fly.forEach(i => { if (G.rings[i].fly && G.t >= G.rings[i].fly.t0) Y[i] = G.xf(i); else Y[i] = X[i] || null; });
+    const c3 = S3.render(S, view, Y, flashes()); ag.globalAlpha = 1 / (k + 1); ag.drawImage(c3, 0, 0, W, H); ag.globalCompositeOperation = 'source-over';
+  }
+  G.t = t0; g.drawImage(acc, 0, 0);
+}
 function draw() {
   const g = ctx; g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1; g.filter = 'none';
-  drawBg(g); drawRings(g); drawGrain(g, cv.width, cv.height); drawTitle(g);
+  drawBg(g); drawRingsMB(g); drawGrain(g, cv.width, cv.height); drawTitle(g);
   g.setTransform(K, 0, 0, K, -view.x0 * K, -view.y0 * K);
   if (editor) drawEditor(g);
   for (let i = ripples.length - 1; i >= 0; i--) { const r = ripples[i], u = (G.t - r.t0) / 0.45; if (u > 1) { ripples.splice(i, 1); continue; } g.strokeStyle = `rgba(255,255,255,${0.8 * (1 - u)})`; g.lineWidth = 5; g.beginPath(); g.arc(r.x, r.y, 12 + 40 * u, 0, 7); g.stroke(); }
@@ -202,19 +228,23 @@ cv.addEventListener('pointerleave', () => { if (!auto && !pd) hand.visible = fal
 
 // ---------- 关卡编辑器 ----------
 const ED_TOOLS = [['move', '移动环/扣'], ['add', '加环'], ['gap', '旋转缺口'], ['color', '改色'], ['link', '连扣(先点主人再点被扣)'], ['erase', '删除']];
-function openEditor() { stopAuto(); newGame(); editor = { tool: 'move', color: 'red', lv: JSON.parse(JSON.stringify({ name: level.name, rings: level.rings, clips: level.clips })), drag: null, link: -1 }; buildEditBar(); toast('关卡编辑器：拖动环或扣子移动；工具栏切换加环 / 缺口 / 改色 / 连扣 / 删除', 3000); }
-function closeEditor(save = true) { if (!editor) return; const lv = editor.lv; editor = null; const bar = document.getElementById('editBar'); if (bar) bar.remove(); if (save) { S.levelJson = JSON.stringify({ name: lv.name && lv.name !== '参考关卡' ? lv.name : '自定义关卡', rings: lv.rings, clips: lv.clips }); saveSettings(S); buildPanel(); } newGame(); }
+function openEditor() { stopAuto(); newGame(); editor = { tool: 'move', color: 'red', lv: JSON.parse(JSON.stringify({ name: level.name, rings: level.rings, clips: level.clips, theme: level.theme, word: level.word })), ch: 'A', drag: null, link: -1 }; buildEditBar(); toast('关卡编辑器：拖动环或扣子移动；工具栏切换加环 / 缺口 / 改色 / 连扣 / 删除', 3000); }
+function closeEditor(save = true) { if (!editor) return; const lv = editor.lv; editor = null; const bar = document.getElementById('editBar'); if (bar) bar.remove(); if (save) { S[levelKey(S)] = JSON.stringify({ name: lv.name && lv.name !== '参考关卡' ? lv.name : '自定义关卡', rings: lv.rings, clips: lv.clips, theme: lv.theme, word: lv.word }); saveSettings(S); buildPanel(); } newGame(); }
 function edRefresh() { level = normalizeLevel(editor.lv); L = placeLevel(level); G = new Game(L, S); const n = document.getElementById('edInfo'); if (n) { const s = solveLevel(level, S.gripLimit); editor.stuck = s.stuck; n.textContent = `${level.rings.length} 个环 · ${level.clips.length} 个扣 · ${s.solvable ? '✔ 可全部解开（顺序 ' + s.order.join('→') + '）' : `✖ 不可解：${s.stuck.length} 个环卡死（红圈）`}`; } }
-function edHitRing(x, y) { const lx = IBX(x), ly = IBY(y); let best = -1, bd = S.ringR + S.tubeR + 10; editor.lv.rings.forEach((r, i) => { const d = Math.abs(Math.hypot(lx - r.x, ly - r.y) - S.ringR); if (d < S.tubeR + 14 && d < bd) { bd = d; best = i; } }); if (best < 0) editor.lv.rings.forEach((r, i) => { const d = Math.hypot(lx - r.x, ly - r.y); if (d < S.ringR * 0.8 && d < bd) { bd = d; best = i; } }); return best; }
+function edHitRing(x, y) { const lx = IBX(x), ly = IBY(y); if (editor.lv.theme === 'letters') { let b = -1, bd = S.letterTube + 14; editor.lv.rings.forEach((r, i) => { const q = glyphNearest(glyphPolys(r.ch, r.h || 140, r.rot || 0), lx - r.x, ly - r.y); if (q.d < bd) { bd = q.d; b = i; } }); return b; } let best = -1, bd = S.ringR + S.tubeR + 10; editor.lv.rings.forEach((r, i) => { const d = Math.abs(Math.hypot(lx - r.x, ly - r.y) - S.ringR); if (d < S.tubeR + 14 && d < bd) { bd = d; best = i; } }); if (best < 0) editor.lv.rings.forEach((r, i) => { const d = Math.hypot(lx - r.x, ly - r.y); if (d < S.ringR * 0.8 && d < bd) { bd = d; best = i; } }); return best; }
 function edHitClip(x, y) { const lx = IBX(x), ly = IBY(y); let best = -1, bd = S.clipSize * 0.9; editor.lv.clips.forEach((c, k) => { const d = Math.hypot(lx - c.x, ly - c.y); if (d < bd) { bd = d; best = k; } }); return best; }
 function editorDown(x, y) {
   const T = editor.tool, lv = editor.lv, lx = IBX(x), ly = IBY(y);
+  const LTE = lv.theme === 'letters';
+  if (T === 'add' && LTE) { lv.rings.push({ c: editor.color, ch: (editor.ch || 'A').toUpperCase(), x: Math.round(lx), y: Math.round(ly), rot: 0, h: 140 }); lv.word = lv.rings.map(r => r.ch).join(''); edRefresh(); return; }
   if (T === 'add') { lv.rings.push({ c: editor.color, x: Math.round(lx), y: Math.round(ly), gap: 90 }); edRefresh(); return; }
   const k = edHitClip(x, y), i = edHitRing(x, y);
   if (T === 'move') { if (k >= 0) editor.drag = { k, dx: lv.clips[k].x - lx, dy: lv.clips[k].y - ly }; else if (i >= 0) editor.drag = { i, x0: lx, y0: ly, r0: { x: lv.rings[i].x, y: lv.rings[i].y }, c0: lv.clips.map(c => c.o === i ? [c.x, c.y] : null) }; return; }
   if (T === 'erase') { if (k >= 0) lv.clips.splice(k, 1); else if (i >= 0) { lv.rings.splice(i, 1); lv.clips = lv.clips.filter(c => c.o !== i && c.g !== i).map(c => ({ ...c, o: c.o > i ? c.o - 1 : c.o, g: c.g > i ? c.g - 1 : c.g })); } edRefresh(); return; }
   if (i < 0) return;
-  if (T === 'gap') { lv.rings[i].gap = ((lv.rings[i].gap + 45 + 180) % 360) - 180; }
+  if (T === 'gap' && LTE) { lv.rings[i].rot = ((lv.rings[i].rot || 0) + 45) % 360; }
+  else if (T === 'link' && LTE) { if (editor.link < 0) { editor.link = i; toast('已选主人字母（连杆一端），再点被扣住的字母（米珠位置）'); return; } if (editor.link !== i) { const a = lv.rings[editor.link], b = lv.rings[i], qb = glyphNearest(glyphPolys(b.ch, b.h || 140, b.rot || 0), lx - b.x, ly - b.y), bx = b.x + qb.x, by = b.y + qb.y, qa = glyphNearest(glyphPolys(a.ch, a.h || 140, a.rot || 0), bx - a.x, by - a.y); lv.clips.push({ o: editor.link, g: i, x: Math.round(bx), y: Math.round(by), rx: Math.round(a.x + qa.x), ry: Math.round(a.y + qa.y) }); } editor.link = -1; }
+  else if (T === 'gap') { lv.rings[i].gap = ((lv.rings[i].gap + 45 + 180) % 360) - 180; }
   else if (T === 'color') lv.rings[i].c = editor.color;
   else if (T === 'link') { if (editor.link < 0) { editor.link = i; toast('已选主人环，再点被扣住的环'); return; } if (editor.link !== i) { const a = lv.rings[editor.link], b = lv.rings[i], p1 = circleX(a, b, S.ringR, 1), p2 = circleX(a, b, S.ringR, -1), p = Math.hypot(p1.x - lx, p1.y - ly) < Math.hypot(p2.x - lx, p2.y - ly) ? p1 : p2; lv.clips = lv.clips.filter(c => !((c.o === editor.link && c.g === i) || (c.o === i && c.g === editor.link))); lv.clips.push({ o: editor.link, g: i, x: Math.round(p.x), y: Math.round(p.y) }); } editor.link = -1; }
   edRefresh();
@@ -230,19 +260,20 @@ function buildEditBar() {
   let bar = document.getElementById('editBar'); if (bar) bar.remove(); bar = document.createElement('div'); bar.id = 'editBar';
   bar.innerHTML = `<b>✏ 关卡编辑</b> <span class="seg" id="edTools">${ED_TOOLS.map(([k, t]) => `<button data-t="${k}" class="${k === 'move' ? 'on' : ''}">${t}</button>`).join('')}</span>
   <span class="seg" id="edCols">${COLORS.map(c => `<button data-c="${c}" class="${c === 'red' ? 'on' : ''}" style="color:${S['col_' + c]}">●${COLOR_ZH[c]}</button>`).join('')}</span>
-  <button id="edClear">清空</button><button id="edDone" class="primary">✔ 完成并试玩</button><button id="edCancel">取消</button><div id="edInfo"></div>`;
+  ${L.theme === 'letters' ? `字母<input id="edCh" maxlength="1" value="A" style="width:28px"> 单词<input id="edWord" value="${L.word || ''}" style="width:90px">` : ''}<button id="edClear">清空</button><button id="edDone" class="primary">✔ 完成并试玩</button><button id="edCancel">取消</button><div id="edInfo"></div>`;
   document.getElementById('stageWrap').append(bar);
   bar.querySelectorAll('#edTools button').forEach(b => b.onclick = () => { editor.tool = b.dataset.t; editor.link = -1; bar.querySelectorAll('#edTools button').forEach(x => x.classList.toggle('on', x === b)); });
   bar.querySelectorAll('#edCols button').forEach(b => b.onclick = () => { editor.color = b.dataset.c; bar.querySelectorAll('#edCols button').forEach(x => x.classList.toggle('on', x === b)); });
+  const ec = bar.querySelector('#edCh'), ew = bar.querySelector('#edWord'); if (ec) ec.oninput = () => editor.ch = ec.value.toUpperCase(); if (ew) ew.onchange = () => { editor.lv.word = ew.value.toUpperCase(); edRefresh(); };
   bar.querySelector('#edClear').onclick = () => { if (confirm('清空所有环？')) { editor.lv.rings = []; editor.lv.clips = []; edRefresh(); } };
   bar.querySelector('#edDone').onclick = () => closeEditor(true); bar.querySelector('#edCancel').onclick = () => closeEditor(false);
   edRefresh();
 }
 function levelCheck() { const lv = levelFromSettings(S), s = solveLevel(lv, S.gripLimit); toast(s.solvable ? `✔ 可全部解开（${lv.rings.length} 个环，顺序 ${s.order.join('→')}）` : `✖ 不可解：${s.stuck.length} 个环卡死`, 3000); return s; }
-function levelExport() { const lv = levelFromSettings(S); download(new Blob([JSON.stringify({ app: APP_ID, level: { name: lv.name, rings: lv.rings, clips: lv.clips } }, null, 1)], { type: 'application/json' }), 'ring-untangle-level.json'); }
-function levelImport() { const f = document.createElement('input'); f.type = 'file'; f.accept = '.json,application/json'; f.onchange = () => { const file = f.files[0]; if (!file) return; file.text().then(t => { const j = JSON.parse(t), lv = normalizeLevel(j.level || j); if (!lv.rings.length) throw new Error('没有有效的环'); S.levelJson = JSON.stringify({ name: lv.name || file.name, rings: lv.rings, clips: lv.clips }); saveSettings(S); buildPanel(); newGame(); toast(`已导入 ${lv.rings.length} 个环`); }).catch(e => toast('导入失败：' + e.message)); }; f.click(); }
-function doRandom() { const lv = randomLevel(S); S.levelJson = JSON.stringify({ name: lv.name, rings: lv.rings, clips: lv.clips }); saveSettings(S); buildPanel(); newGame(); toast(`随机关卡：${lv.rings.length} 个环、${lv.clips.length} 个扣（「画布与关卡」可恢复参考关卡）`, 2200); }
-function levelRef() { S.levelJson = ''; saveSettings(S); buildPanel(); newGame(); toast('已恢复参考关卡'); }
+function levelExport() { const lv = levelFromSettings(S); download(new Blob([JSON.stringify({ app: APP_ID, level: { name: lv.name, rings: lv.rings, clips: lv.clips, theme: lv.theme, word: lv.word } }, null, 1)], { type: 'application/json' }), 'ring-untangle-level.json'); }
+function levelImport() { const f = document.createElement('input'); f.type = 'file'; f.accept = '.json,application/json'; f.onchange = () => { const file = f.files[0]; if (!file) return; file.text().then(t => { const j = JSON.parse(t), lv = normalizeLevel(j.level || j); if (!lv.rings.length) throw new Error('没有有效的环'); S[levelKey(S)] = JSON.stringify({ name: lv.name || file.name, rings: lv.rings, clips: lv.clips, theme: lv.theme, word: lv.word }); saveSettings(S); buildPanel(); newGame(); toast(`已导入 ${lv.rings.length} 个环`); }).catch(e => toast('导入失败：' + e.message)); }; f.click(); }
+function doRandom() { const lv = randomLevel(S); S[levelKey(S)] = JSON.stringify({ name: lv.name, rings: lv.rings, clips: lv.clips, theme: lv.theme, word: lv.word }); saveSettings(S); buildPanel(); newGame(); toast(`随机关卡：${lv.rings.length} 个环、${lv.clips.length} 个扣（「画布与关卡」可恢复参考关卡）`, 2200); }
+function levelRef() { S[levelKey(S)] = ''; saveSettings(S); buildPanel(); newGame(); toast('已恢复参考关卡'); }
 
 // ---------- 录制（只由“⏺ 开始录制”或 autoRec 触发）----------
 let rec = null, recChunks = [], recT0 = 0;
@@ -271,7 +302,7 @@ function sceneItems() {
 function makeAssets() {
   const A = {}, mk = (w, h) => { const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w)); c.height = Math.max(1, Math.round(h)); return c; };
   { const c = mk(cv.width, cv.height), g = c.getContext('2d'), sv = ctx; void sv; const gr = g.createLinearGradient(0, 0, 0, c.height); gr.addColorStop(0, S.bgTop); gr.addColorStop(1, S.bgBottom); g.fillStyle = gr; g.fillRect(0, 0, c.width, c.height); drawGrain(g, c.width, c.height); A.background = { c, ax: 0, ay: 0 }; }
-  if (S.titleShow) { const c = mk(cv.width, cv.height), g = c.getContext('2d'); g.setTransform(K, 0, 0, K, -view.x0 * K, -view.y0 * K); g.fillStyle = S.titleBar; g.fillRect(view.x0 - 2, S.titleY, view.w + 4, S.titleH); g.fillStyle = S.titleColor; g.font = `900 ${S.titleSize}px "Arial Black","Noto Sans CJK SC",sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(S.titleText, DW / 2, S.titleY + S.titleH / 2 + S.titleSize * 0.04); A.title = { c, ax: 0, ay: 0 }; }
+  if (S.titleShow) { const c = mk(cv.width, cv.height), g = c.getContext('2d'); g.setTransform(K, 0, 0, K, -view.x0 * K, -view.y0 * K); g.fillStyle = S.titleBar; g.fillRect(view.x0 - 2, S.titleY, view.w + 4, S.titleH); g.fillStyle = S.titleColor; g.font = `900 ${S.titleSize}px "Arial Black","Noto Sans CJK SC",sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.translate(DW / 2, S.titleY + S.titleH / 2 + S.titleSize * 0.04 + (S.titleDY || 0)); g.scale(S.titleSX || 1, 1); g.fillText(S.titleText, 0, 0); A.title = { c, ax: 0, ay: 0 }; }
   const rest = L.rings.map(r => ({ x: r.x, y: r.y, rot: 0, sc: 1, op: 1 })), Rm = (S.ringR + S.tubeR) * bs();
   L.rings.forEach((r, i) => {
     let ext = Rm; L.clips.forEach(c => { if (c.o === i) ext = Math.max(ext, Math.hypot(c.x - r.x, c.y - r.y) + S.clipSize * bs()); });
@@ -333,7 +364,7 @@ function loop() {
 }
 
 // ---------- 设置面板 ----------
-const NEWGAME_KEYS = /^(canvas|levelJson|board|gripLimit)/;
+const NEWGAME_KEYS = /^(canvas|levelJson|board|gripLimit|theme)/;
 function applyChange(k) {
   if (k === 'h5DeviceW' || k === 'h5DeviceH') markH5DeviceCustomIfSizeEdited(S);
   if (k === 'h5Device' || k === 'h5DeviceW' || k === 'h5DeviceH') { try { if (window.__h5EditorDeviceFit) window.__h5EditorDeviceFit(); } catch (e) { } }

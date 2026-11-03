@@ -2,6 +2,7 @@
 // 环 = 沿 C 形曲线的圆截面管（TubeGeometry，带半球圆头），在没有扣子的交叉处按上下层做真实 z 起伏（互相穿插）；
 // 扣子 = 圆角套管（LatheGeometry，圆角矩形截面绕轴旋转），套在“被扣住”的环管上，颜色 = 主人环颜色；离主人环较远的扣子用短柱连到主人环。
 // 材质 = MeshPhysicalMaterial（哑光塑料 + 轻清漆 + 绒光），RoomEnvironment PMREM 环境光 + 柔和主光，ACES / AgX 色调映射。
+import { glyphPolys, glyphNearest } from './glyphs.js';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 const rad = d => d * Math.PI / 180;
@@ -53,32 +54,60 @@ export class Scene3D {
     this.groups = []; this.key = '';
   }
   build(L, S) {
-    const key = JSON.stringify([L.rings, L.clips, ['ringR', 'tubeR', 'gapDeg', 'clipSize', 'roughness', 'clearcoat', 'clearcoatRough', 'sheen', 'envInt', 'clipTint', 'sleeveR', 'sleeveLen', 'sleeveBevel', 'clipRough', 'clipMetal', 'clipClearcoat', 'clipClearcoatRough', 'clipEnvInt', 'metalness', 'specInt', 'specTint', 'iridescence', 'stemMin', 'clipGold', 'crossDepth', 'crossWidth', 'meshQuality', 'sss'].map(k => S[k]), ['red', 'pink', 'orange', 'yellow', 'green', 'teal', 'blue', 'purple'].map(k => S['col_' + k])]);
+    const key = JSON.stringify([L.rings, L.clips, L.theme, ['whiteModel', 'whiteColor', 'letterTube', 'beadColor', 'rodColor', 'rodR', 'beadR', 'beadLen', 'hl_pink', 'hl_red', 'hl_orange', 'hl_yellow', 'hl_green', 'hl_teal', 'hl_blue', 'hl_purple', 'ringR', 'tubeR', 'gapDeg', 'clipSize', 'roughness', 'clearcoat', 'clearcoatRough', 'sheen', 'envInt', 'clipTint', 'sleeveR', 'sleeveLen', 'sleeveBevel', 'clipRough', 'clipMetal', 'clipClearcoat', 'clipClearcoatRough', 'clipEnvInt', 'metalness', 'specInt', 'specTint', 'iridescence', 'stemMin', 'clipGold', 'crossDepth', 'crossWidth', 'meshQuality', 'sss'].map(k => S[k]), ['red', 'pink', 'orange', 'yellow', 'green', 'teal', 'blue', 'purple'].map(k => S['col_' + k])]);
     if (key === this.key) return; this.key = key;
     for (const g of this.groups) { this.root.remove(g); g.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); }
     this.groups = []; this.clipMeshes = [];
     const R = S.ringR, r = S.tubeR, gap = rad(S.gapDeg), arc = Math.PI * 2 - gap, q = S.meshQuality || 1;
     const sr = r * S.sleeveR, sl = r * S.sleeveLen, sleeve = sleeveGeom(sr, sl / 2, Math.min(sr, sl / 2) * S.sleeveBevel, Math.round(40 * q)), cap = new THREE.SphereGeometry(r, Math.round(40 * q), Math.round(24 * q)), stem = new THREE.CylinderGeometry(r * 0.92, r * 0.92, 1, Math.round(24 * q));
     const cross = crossings(L, R, sr);
-    const mkMat = (col, clip = false) => new THREE.MeshPhysicalMaterial({ color: col, roughness: clip ? S.clipRough : S.roughness, metalness: clip ? S.clipMetal : S.metalness, clearcoat: clip ? S.clipClearcoat : S.clearcoat, clearcoatRoughness: clip ? S.clipClearcoatRough : S.clearcoatRough,
-      sheen: S.sheen, sheenRoughness: 0.7, sheenColor: new THREE.Color(col).lerp(new THREE.Color('#ffffff'), 0.55), specularIntensity: S.specInt, specularColor: new THREE.Color('#ffffff').lerp(new THREE.Color(col), S.specTint),
-      iridescence: S.iridescence, iridescenceIOR: 1.3, iridescenceThicknessRange: [200, 500], envMapIntensity: clip ? S.clipEnvInt : S.envInt, emissive: new THREE.Color(col), emissiveIntensity: S.sss });
+    const W = S.whiteModel, wc = S.whiteColor || '#eeeeee';
+    const mkMat = (col, clip = false, hk = 1) => (W && (col = wc), new THREE.MeshPhysicalMaterial({ color: col, roughness: clip ? S.clipRough : S.roughness, metalness: clip ? S.clipMetal : S.metalness, clearcoat: clip ? S.clipClearcoat : S.clearcoat, clearcoatRoughness: clip ? S.clipClearcoatRough : S.clearcoatRough,
+      sheen: S.sheen, sheenRoughness: 0.7, sheenColor: new THREE.Color(col).lerp(new THREE.Color('#ffffff'), 0.55), specularIntensity: S.specInt * hk, specularColor: new THREE.Color('#ffffff').lerp(new THREE.Color(col), S.specTint),
+      iridescence: S.iridescence, iridescenceIOR: 1.3, iridescenceThicknessRange: [200, 500], envMapIntensity: clip ? S.clipEnvInt : S.envInt * (0.5 + 0.5 * hk), emissive: new THREE.Color(col), emissiveIntensity: S.sss }));
+    if (L.theme === 'letters') return this.buildLetters(L, S, mkMat, q, W, wc);
     L.rings.forEach((b, i) => {
       const g = new THREE.Group(); g.userData.i = i;
-      const mat = mkMat(colorOf(S, b.c)); const a0 = -rad(b.gap) + gap / 2;
+      const mat = mkMat(colorOf(S, b.c), false, S['hl_' + b.c] ?? 1); const a0 = -rad(b.gap) + gap / 2;
       const curve = new CCurve(R, a0, arc, cross[i], r * S.crossDepth, S.crossWidth);
       const m = new THREE.Mesh(new THREE.TubeGeometry(curve, Math.round(200 * q), r, Math.round(40 * q), false), mat); m.castShadow = m.receiveShadow = true; g.add(m);
       for (const t of [0, 1]) { const c = new THREE.Mesh(cap, mat); c.position.copy(curve.getPoint(t)); c.castShadow = c.receiveShadow = true; g.add(c); }
       g.userData.mats = [mat];
       L.clips.forEach((c, k) => {
         if (c.o !== i) return;
-        const cm = mkMat(clipColor(S, b.c), true); cm.emissive = new THREE.Color(colorOf(S, b.c)); g.userData.mats.push(cm); this.clipMeshes[k] = cm;
+        const cm = mkMat(clipColor(S, b.c), true); cm.emissive = new THREE.Color(W ? wc : colorOf(S, b.c)); g.userData.mats.push(cm); this.clipMeshes[k] = cm;
         const lx = c.x - b.x, ly = -(c.y - b.y), d = Math.hypot(lx, ly), phi = Math.atan2(ly, lx);
         const gb = L.rings[c.g], psi = Math.atan2(-(c.y - gb.y), c.x - gb.x); // 套管轴 = 被扣住环在该点的切线
         const mb = new THREE.Mesh(sleeve, cm); mb.position.set(lx, ly, 0); mb.rotation.z = psi; mb.castShadow = mb.receiveShadow = true; g.add(mb);
         if (d > R + r * S.stemMin) { const len = d - R - sr * 0.5; if (len > 1) { const st = new THREE.Mesh(stem, cm); st.scale.y = len; st.position.set(Math.cos(phi) * (R + len / 2), Math.sin(phi) * (R + len / 2), 0); st.rotation.z = phi - Math.PI / 2; st.castShadow = true; g.add(st); } }
       });
       g.position.set(b.x, -b.y, 0); this.root.add(g); this.groups.push(g);
+    });
+  }
+  // 字母主题：每个字母 = 若干管状笔画（直线 / 圆弧，端点与拐角用球补圆）；扣子 = 米色珠（套在被扣字母笔画上）+ 黑色细杆（连到主人字母）
+  buildLetters(L, S, mkMat, q, W, wc) {
+    const r = S.letterTube, cap = new THREE.SphereGeometry(r, Math.round(32 * q), Math.round(20 * q));
+    const br = r * S.beadR, bl = r * S.beadLen, bead = sleeveGeom(br, bl / 2, Math.min(br, bl / 2) * S.sleeveBevel, Math.round(36 * q)), rod = new THREE.CylinderGeometry(S.rodR, S.rodR, 1, 16);
+    const ball = new THREE.SphereGeometry(r * 0.75, 24, 16);
+    L.rings.forEach((b, i) => {
+      const g = new THREE.Group(); g.userData.i = i; const mat = mkMat(colorOf(S, b.c), false, S['hl_' + b.c] ?? 1); g.userData.mats = [mat];
+      const P = glyphPolys(b.ch, b.h || 140, b.rot || 0);
+      for (const pl of P) {
+        const pts = pl.map(([x, y]) => new THREE.Vector3(x, -y, 0)), curve = pts.length === 2 ? new THREE.LineCurve3(pts[0], pts[1]) : new THREE.CatmullRomCurve3(pts, false, 'centripetal');
+        const m = new THREE.Mesh(new THREE.TubeGeometry(curve, pts.length === 2 ? 2 : Math.round(pts.length * 3 * q), r, Math.round(32 * q), false), mat); m.castShadow = m.receiveShadow = true; g.add(m);
+        for (const v of [pts[0], pts[pts.length - 1]]) { const c = new THREE.Mesh(cap, mat); c.position.copy(v); c.castShadow = true; g.add(c); }
+      }
+      g.position.set(b.x, -b.y, 0); this.root.add(g); this.groups.push(g);
+    });
+    // 扣子挂在主人字母组里（随主人移动/飞走）；珠轴 = 被扣字母该点切线
+    L.clips.forEach((c, k) => {
+      const o = L.rings[c.o], gb = L.rings[c.g], go = this.groups[c.o]; if (!go) return;
+      const bm = mkMat(W ? wc : S.beadColor, true); bm.emissive = new THREE.Color(W ? wc : S.beadColor); go.userData.mats.push(bm); this.clipMeshes[k] = bm;
+      const rm = new THREE.MeshPhysicalMaterial({ color: W ? wc : S.rodColor, roughness: 0.35, metalness: 0.6, clearcoat: 0.5 }); go.userData.mats.push(rm);
+      const tg = glyphNearest(glyphPolys(gb.ch, gb.h || 140, gb.rot || 0), c.x - gb.x, c.y - gb.y);
+      const lx = c.x - o.x, ly = -(c.y - o.y), mb = new THREE.Mesh(bead, bm); mb.position.set(lx, ly, 0); mb.rotation.z = -tg.ang - Math.PI / 2; mb.castShadow = mb.receiveShadow = true; go.add(mb);
+      const ex = (c.rx ?? o.x) - o.x, ey = -((c.ry ?? o.y) - o.y), dx = ex - lx, dy = ey - ly, len = Math.hypot(dx, dy);
+      if (len > 1) { const st = new THREE.Mesh(rod, rm); st.scale.y = len; st.position.set((lx + ex) / 2, (ly + ey) / 2, 0); st.rotation.z = Math.atan2(dy, dx) - Math.PI / 2; st.castShadow = true; go.add(st); }
     });
   }
   // 影棚环境：暗底 + 发光柔光箱条（顶部长条 / 左右竖条 / 暖色地面反光）→ PMREM，让金属管沿长度出现明亮清晰的反光条和暗带

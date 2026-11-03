@@ -1,13 +1,37 @@
 // 解环核玩工具 —— 设置定义（中文标签），版本号 + 迁移。通用分组 / 键名按 game-toolkit-standard/TOOLKIT_STANDARD.md
 import { h5DeviceSelectOptions } from './h5/index.js';
-export const APP_VERSION = '1.5.0';
-export const SETTINGS_VERSION = 7;
+export const APP_VERSION = '1.7.0';
+export const SETTINGS_VERSION = 9;
 export const STORE_KEY = 'ringUntangleTool.settings';
 export const APP_ID = 'ring-untangle-tool';
 const ALL8 = 'applovin,facebook,google,mintegral,moloco,tiktok,unity,generic';
 // [key, 标签, 类型, 默认, min, max, step]
 export const GROUPS = [
+  ['字母型解锁（参考 letters_ref.mp4）', [
+    ['letterTube', '字母管半径(px，参考≈9)', 'range', 9.5, 3, 24, 0.5],
+    ['beadColor', '米色珠颜色(参考≈#F2E2B8)', 'color', '#eadcb6'],
+    ['beadR', '珠外半径(×管半径)', 'range', 1.9, 1.05, 3, 0.01],
+    ['beadLen', '珠长度(×管半径)', 'range', 1.45, 0.5, 4, 0.05],
+    ['rodColor', '连杆颜色', 'color', '#2b2d33'],
+    ['rodR', '连杆半径(px)', 'range', 2.4, 0.5, 8, 0.1],
+    ['releaseDeg', 'C 缺口对准珠的脱扣容差(°)', 'range', 16, 2, 60, 1],
+    ['letterFlyDur', '字母飞入单词槽时长(ms)', 'range', 520, 100, 2000, 10],
+    ['letterArc', '飞行上抛弧高(px)', 'range', 90, 0, 400, 5],
+    ['slotScale', '飞入槽后缩放', 'range', 0.36, 0.1, 1, 0.01],
+    ['slotY', '单词槽顶部 Y(px，参考 152)', 'range', 152, 0, 600, 1],
+    ['slotW', '单词槽格宽(px，参考 67)', 'range', 67, 20, 140, 1],
+    ['slotH', '单词槽格高(px，参考 82)', 'range', 82, 20, 160, 1],
+    ['slotGap', '单词槽格间距(px)', 'range', 8, 0, 40, 1],
+    ['lvTitle', '关卡标题（空 = 不显示）', 'text', 'Level 5'],
+    ['lvTitleSize', '关卡标题字号', 'range', 36, 10, 80, 1],
+    ['lvTitleY', '关卡标题 Y', 'range', 88, 0, 400, 1],
+    ['lbgTop', '字母主题背景顶部(参考≈#C1DEFB)', 'color', '#c1defb'],
+    ['lbgBottom', '字母主题背景底部(参考≈#A9B4E6)', 'color', '#aab6e8'],
+  ]],
   ['画布与关卡', [
+    ['theme', '主题（玩法）', 'select', 'rings', [['rings', '环形解锁'], ['letters', '字母型解锁']]],
+    ['whiteModel', '白模模式（所有环/字母/扣子渲染为白色黏土，保留光影）', 'bool', false],
+    ['whiteColor', '白模颜色', 'color', '#eeeeee'],
     ['canvasW', '画布宽度(px)', 'range', 720, 360, 1440, 2],
     ['canvasH', '画布高度(px)', 'range', 1280, 640, 2560, 2],
     ['_levelEdit', '关卡编辑器（加环 / 移动 / 旋转缺口 / 改色 / 连扣 / 删除）', 'button', 'levelEdit', '✏ 打开关卡编辑器'],
@@ -16,6 +40,7 @@ export const GROUPS = [
     ['_levelImport', '导入关卡 JSON', 'button', 'levelImport', '⬆ 导入关卡'],
     ['_levelRef', '恢复参考视频关卡（11 个环，12 个扣）', 'button', 'levelRef', '↺ 参考关卡'],
     ['levelJson', '关卡数据（JSON；留空 = 内置参考关卡）', 'textarea', ''],
+    ['levelJsonL', '字母关卡数据（JSON；留空 = 内置 LUNCH 参考关卡）', 'textarea', ''],
     ['boardScale', '关卡整体缩放', 'range', 1, 0.5, 1.6, 0.01],
     ['boardX', '关卡水平偏移(px)', 'range', 0, -300, 300, 1],
     ['boardY', '关卡垂直偏移(px)', 'range', 0, -400, 400, 1],
@@ -35,6 +60,8 @@ export const GROUPS = [
     ['titleBar', '标题条颜色', 'color', '#000000'],
     ['titleY', '标题条顶部 Y(px，参考 60)', 'range', 60, 0, 400, 1],
     ['titleH', '标题条高度(px，参考 120)', 'range', 120, 40, 300, 1],
+    ['titleSX', '标题横向拉宽(参考字更宽≈1.19)', 'range', 1.19, 0.5, 2, 0.01],
+    ['titleDY', '标题文字上下偏移(px)', 'range', -13, -60, 60, 1],
     ['titleSize', '标题字号(px，参考 100)', 'range', 100, 30, 200, 1],
   ]],
   ['环与扣（3D 建模）', [
@@ -59,16 +86,24 @@ export const GROUPS = [
     ['clipTint', '扣子颜色偏移（同环色变亮/偏青）', 'range', 0.04, 0, 0.6, 0.01],
     ['envInt', '环境反射强度', 'range', 0.75, 0, 3, 0.05],
     ['metalness', '环金属度(对齐参考≈0.35，光泽主要来自清漆)', 'range', 0.35, 0, 1, 0.01],
+    ['hl_pink', '粉环高光/反射倍率', 'range', 0.9, 0, 2, 0.01],
+    ['hl_red', '红环高光/反射倍率', 'range', 1, 0, 2, 0.01],
+    ['hl_orange', '橙环高光/反射倍率', 'range', 1.0, 0, 2, 0.01],
+    ['hl_yellow', '黄环高光/反射倍率', 'range', 1.0, 0, 2, 0.01],
+    ['hl_green', '绿环高光/反射倍率', 'range', 1, 0, 2, 0.01],
+    ['hl_teal', '深绿环高光/反射倍率', 'range', 0.35, 0, 2, 0.01],
+    ['hl_blue', '蓝环高光/反射倍率', 'range', 0.1, 0, 2, 0.01],
+    ['hl_purple', '紫环高光/反射倍率', 'range', 0.45, 0, 2, 0.01],
     ['specInt', '环高光强度', 'range', 0.65, 0, 2, 0.01],
     ['specTint', '高光带本色(珠光感)', 'range', 0.6, 0, 1, 0.01],
     ['iridescence', '虹彩(珠光)', 'range', 0.08, 0, 1, 0.01],
-    ['clipMetal', '扣子金属镀层(参考≈0.45)', 'range', 0.55, 0, 1, 0.01],
+    ['clipMetal', '扣子金属镀层(参考≈0.45)', 'range', 0.4, 0, 1, 0.01],
     ['clipRough', '扣子粗糙度(参考亮滑≈0.24)', 'range', 0.38, 0, 1, 0.01],
     ['clipClearcoat', '扣子清漆', 'range', 1, 0, 1, 0.01],
     ['clipClearcoatRough', '扣子清漆粗糙度', 'range', 0.35, 0, 1, 0.01],
     ['clipEnvInt', '扣子环境反射', 'range', 1.6, 0, 3, 0.05],
-    ['clipGold', '黄/橙扣子偏金色(镀金)', 'range', 0.7, 0, 1, 0.01],
-    ['col_gold', '镀金色', 'color', '#b08a3c'],
+    ['clipGold', '黄/橙扣子偏金色(镀金)', 'range', 0.55, 0, 1, 0.01],
+    ['col_gold', '镀金色', 'color', '#e6b24a'],
     ['stemMin', '离主人环多远才画短柱(×管半径)', 'range', 1.6, 0.5, 8, 0.1],
     ['envMode', '环境贴图', 'select', 'studio', [['studio', '影棚柔光箱（金属反光条）'], ['room', 'RoomEnvironment']]],
     ['envBoxes', '柔光箱亮度', 'range', 1.2, 0, 3, 0.05],
@@ -91,14 +126,14 @@ export const GROUPS = [
     ['grain', '画面颗粒/胶片噪点', 'range', 0.06, 0, 0.3, 0.005],
     ['selfShadow', '环之间的投影(真实阴影贴图)', 'bool', true],
     ['selfShadowSoft', '环间投影柔和度', 'range', 6, 0, 20, 0.5],
-    ['col_pink', '粉红色(参考上中红环≈#D9666A)', 'color', '#c8363c'],
-    ['col_red', '红色(参考亮部≈#E8434A)', 'color', '#e0343f'],
+    ['col_pink', '粉红色(参考上中红环≈#D9666A)', 'color', '#cc3c42'],
+    ['col_red', '红色(参考亮部≈#E8434A)', 'color', '#d2323c'],
     ['col_orange', '橙色(参考≈#F07A36)', 'color', '#e85a12'],
-    ['col_yellow', '黄色(参考≈#F5BB4F)', 'color', '#d88a1e'],
-    ['col_green', '绿色(参考≈#78B44C)', 'color', '#529a28'],
-    ['col_teal', '深绿色(参考≈#3FA766)', 'color', '#1c7c48'],
-    ['col_blue', '蓝色(参考≈#4067C5)', 'color', '#2f52b0'],
-    ['col_purple', '紫色(参考≈#A644B3)', 'color', '#8c2c98'],
+    ['col_yellow', '黄色(参考≈#F5BB4F)', 'color', '#eca62a'],
+    ['col_green', '绿色(参考≈#78B44C)', 'color', '#5ea832'],
+    ['col_teal', '深绿色(参考≈#3FA766)', 'color', '#2a8a52'],
+    ['col_blue', '蓝色(参考≈#4067C5)', 'color', '#3859bc'],
+    ['col_purple', '紫色(参考≈#A644B3)', 'color', '#a03aa8'],
   ]],
   ['玩法与动画', [
     ['gripLimit', '最多同时被几个扣夹住仍可取下（0 = 不限，参考）', 'range', 0, 0, 4, 1],
@@ -109,6 +144,9 @@ export const GROUPS = [
     ['flyDist', '飞出距离(px)', 'range', 220, 0, 600, 5],
     ['flyLift', '飞出上抬(px)', 'range', 120, 0, 400, 5],
     ['flyScale', '飞出放大倍数', 'range', 1.0, 0.5, 2, 0.01],
+    ['flyDelay', '松手到弹出延迟(ms，参考≈200)', 'range', 200, 0, 600, 10],
+    ['mblur', '弹出动态模糊快门(ms，0=关)', 'range', 40, 0, 200, 5],
+    ['mblurN', '动态模糊采样数', 'range', 8, 2, 24, 1],
     ['flySpin', '飞出旋转(°)', 'range', 15, -180, 180, 1],
     ['shakeDur', '卡住抖动时长(ms)', 'range', 380, 50, 1500, 10],
     ['shakeDeg', '卡住抖动幅度(°)', 'range', 6, 0, 30, 0.5],
@@ -195,7 +233,7 @@ export const GROUPS = [
 export const DEFS = {};
 for (const [, items] of GROUPS) for (const it of items) if (it[2] !== 'button') DEFS[it[0]] = it[3];
 // v2（材质/建模复刻）：仍等于 v1 默认值的项换成新默认
-export const OLD_DEFAULTS = { 7: { flyDur: 420, flyDist: 110, flyLift: 40, flyScale: 1.12, flySpin: 35, ambInt: 0.45, fillInt: 0.4, envInt: 1.25, exposure: 1.12, envDark: '#8a847c', col_orange: '#ea6d27', col_pink: '#d6464e', col_green: '#62aa36', col_teal: '#24905a', col_purple: '#9a33aa', col_blue: '#3159bd', envBoxH: 5.5, clearcoatRough: 0.22, envWarm: '#b4732e', col_yellow: '#d8891a', clipRough: 0.18, clipMetal: 0.6, clipGold: 0.45, col_gold: '#b8903a', clipClearcoatRough: 0.04, sleeveR: 1.62, sleeveLen: 2.9, depthBlur: 1.2, grain: 0.05, specInt: 1.0 }, 6: { roughness: 0.3, clearcoatRough: 0.12, col_yellow: '#dc901c', envWarm: '#c08a50' }, 5: { metalness: 0.6, roughness: 0.26, clearcoatRough: 0.08, clipMetal: 0.8, clipRough: 0.16, envBoxes: 1, envDark: '#77716a' }, 4: { metalness: 0, roughness: 0.4, clearcoat: 0.2, clearcoatRough: 0.65, sheen: 0.15, envInt: 0.6, specTint: 0.25, exposure: 0.8, clipMetal: 0.45, clipRough: 0.24, clipClearcoat: 0.8, clipClearcoatRough: 0.18, clipEnvInt: 1.3, lightInt: 3.8, ambInt: 0.35, fillInt: 0.35, sss: 0.0 }, 3: { sleeveR: 1.42, sleeveLen: 2.5, sleeveBevel: 0.2, roughness: 0.5, clearcoat: 0.25, clearcoatRough: 0.5, sheen: 0.35, envInt: 0.5, shadowAlpha: 0.3, shadowBlur: 14, shadowDX: 4, shadowDY: 16, col_red: '#d8303a', col_orange: '#e86a25', col_yellow: '#e9a72f-old', col_green: '#4f9f2a', col_teal: '#22894a', col_blue: '#2f55b8', col_purple: '#9530a8' }, 2: { ringR: 90, tubeR: 14, gapDeg: 52, roughness: 0.38, lightInt: 2.4, ambInt: 1.25, clipTint: 0.08, col_red: '#d9484b', col_orange: '#e8782f', col_yellow: '#e9b23c', col_green: '#3fa83f', col_teal: '#2b8f52', col_blue: '#3a5fc6', col_purple: '#9b3fb8', shadowAlpha: 0.22, shadowBlur: 10, shadowDX: 6, shadowDY: 12, bgTop: '#c4c3c4' } };
+export const OLD_DEFAULTS = { 9: {}, 8: { col_red: '#e0343f', col_purple: '#8c2c98', col_green: '#529a28', col_teal: '#1c7c48', col_yellow: '#d88a1e', col_gold: '#b08a3c', clipMetal: 0.55, clipGold: 0.7, col_blue: '#2f52b0', col_pink: '#c8363c' }, 7: { flyDur: 420, flyDist: 110, flyLift: 40, flyScale: 1.12, flySpin: 35, ambInt: 0.45, fillInt: 0.4, envInt: 1.25, exposure: 1.12, envDark: '#8a847c', col_orange: '#ea6d27', col_pink: '#d6464e', col_green: '#62aa36', col_teal: '#24905a', col_purple: '#9a33aa', col_blue: '#3159bd', envBoxH: 5.5, clearcoatRough: 0.22, envWarm: '#b4732e', col_yellow: '#d8891a', clipRough: 0.18, clipMetal: 0.6, clipGold: 0.45, col_gold: '#b8903a', clipClearcoatRough: 0.04, sleeveR: 1.62, sleeveLen: 2.9, depthBlur: 1.2, grain: 0.05, specInt: 1.0 }, 6: { roughness: 0.3, clearcoatRough: 0.12, col_yellow: '#dc901c', envWarm: '#c08a50' }, 5: { metalness: 0.6, roughness: 0.26, clearcoatRough: 0.08, clipMetal: 0.8, clipRough: 0.16, envBoxes: 1, envDark: '#77716a' }, 4: { metalness: 0, roughness: 0.4, clearcoat: 0.2, clearcoatRough: 0.65, sheen: 0.15, envInt: 0.6, specTint: 0.25, exposure: 0.8, clipMetal: 0.45, clipRough: 0.24, clipClearcoat: 0.8, clipClearcoatRough: 0.18, clipEnvInt: 1.3, lightInt: 3.8, ambInt: 0.35, fillInt: 0.35, sss: 0.0 }, 3: { sleeveR: 1.42, sleeveLen: 2.5, sleeveBevel: 0.2, roughness: 0.5, clearcoat: 0.25, clearcoatRough: 0.5, sheen: 0.35, envInt: 0.5, shadowAlpha: 0.3, shadowBlur: 14, shadowDX: 4, shadowDY: 16, col_red: '#d8303a', col_orange: '#e86a25', col_yellow: '#e9a72f-old', col_green: '#4f9f2a', col_teal: '#22894a', col_blue: '#2f55b8', col_purple: '#9530a8' }, 2: { ringR: 90, tubeR: 14, gapDeg: 52, roughness: 0.38, lightInt: 2.4, ambInt: 1.25, clipTint: 0.08, col_red: '#d9484b', col_orange: '#e8782f', col_yellow: '#e9b23c', col_green: '#3fa83f', col_teal: '#2b8f52', col_blue: '#3a5fc6', col_purple: '#9b3fb8', shadowAlpha: 0.22, shadowBlur: 10, shadowDX: 6, shadowDY: 12, bgTop: '#c4c3c4' } };
 export function migrate(obj) {
   if (!obj || typeof obj !== 'object') return { ...DEFS };
   let v = obj.version || 0; const s = { ...(obj.settings || obj) };

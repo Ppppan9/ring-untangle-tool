@@ -50,5 +50,20 @@ await q.mouse.move(rr[0], rr[1]); await q.mouse.down(); await q.mouse.move(rr[0]
 ok(await q.evaluate(s => window.__h5State() !== s, s0), 'H5：点击拖动改变游戏状态');
 await q.screenshot({ path: 'screenshots/h5_generic_390x844.png' });
 ok(errs2.length === 0, 'H5 无报错 ' + JSON.stringify(errs2));
+// 5) 字母型解锁主题
+await p.evaluate(() => { window.__vclock = window.__vclock || null; __game.setMany({ theme: 'letters' }); });
+ok(await p.evaluate(() => __game.L.theme === 'letters' && __game.L.rings.length === 5 && __game.solveLevel(__game.levelFromSettings(__game.S)).solvable), '字母主题：LUNCH 参考关卡 5 个字母，可解');
+await p.evaluate(() => { window.__T = 200000; __game.renderAt(window.__T); __game.startAuto(); });
+let lr = null; for (let s2 = 0; s2 < 30; s2++) { lr = await advance(p, 1); if (lr.win != null) break; }
+ok(lr.win != null && lr.left === 0, `字母主题：自动通关（参考序列，含转 C 脱扣），用时 ${lr.t.toFixed(1)} 秒`);
+ok(await p.evaluate(() => __game.G.rings.every(r => r.slot != null)), '字母主题：全部字母飞入单词槽');
+await p.evaluate(() => { __game.setMany({ autoMode: 'solver' }); __game.startAuto(); });
+lr = null; for (let s2 = 0; s2 < 40; s2++) { lr = await advance(p, 1); if (lr.win != null) break; }
+ok(lr.win != null, `字母主题：求解模式自动通关 ${lr.t.toFixed(1)} 秒`);
+await p.evaluate(() => __game.setMany({ autoMode: 'ref', whiteModel: true }));
+await grab(() => __game.doExportAE(), '字母主题 AE 导出（白模）');
+const h5L = await grab(() => __game.doExportH5(), '字母主题 H5 导出（白模）');
+await grab(() => __game.doExport3D(), '字母主题 3D 导出（白模）');
+await p.evaluate(() => __game.setMany({ theme: 'rings', whiteModel: false }));
 ok(errs.length === 0, '全程无 console/page error ' + JSON.stringify(errs));
 await b.close();

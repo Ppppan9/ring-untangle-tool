@@ -1,3 +1,4 @@
+import { glyphPolys, glyphNearest, LETTERS } from './glyphs.js';
 // 解环核玩工具 —— 关卡数据 / 规则 / 动画状态（与渲染无关，确定性）
 // 关卡：rings = [{c:颜色键, x, y, gap:缺口朝向(°，屏幕坐标 0=右 90=下)}]，clips = [{o:扣的主人(环索引), g:被扣住的环, x, y}]
 // 规则（来自参考视频：被取下的环留下的扣子仍挂在主人环上）：一个环自己身上没有仍扣着别的环的扣子 → 可以从别人的扣子里滑出取下；否则被卡住。
@@ -29,20 +30,33 @@ export const REF_LEVEL = {
     CC(6, 9, 220, 725), CC(7, 9, 315, 733), CC(6, 8, 132, 765), CC(7, 10, 400, 775),
   ].map(c => snapClip(c.o, c.g, c.x, c.y)),
 };
+// 字母型解锁参考关卡（letters_ref.mp4 第 5 关 LUNCH，38.5 s 截帧量取；参考 592 宽 → 设计 720 宽 x+64）
+// 扣子 = 米色珠套在被扣字母 g 的笔画上（x,y），黑色细杆连到主人字母 o 的笔画（rx,ry）
+export const LETTER_LEVEL = {
+  name: '字母参考关卡 LUNCH', theme: 'letters', word: 'LUNCH',
+  rings: [
+    { c: 'yellow', ch: 'C', x: 224, y: 605, rot: 180, h: 140 }, { c: 'pink', ch: 'H', x: 424, y: 572, rot: 0, h: 142 },
+    { c: 'teal', ch: 'U', x: 259, y: 838, rot: 0, h: 140 }, { c: 'orange', ch: 'L', x: 404, y: 828, rot: 0, h: 136 }, { c: 'purple', ch: 'N', x: 514, y: 840, rot: 0, h: 136 },
+  ],
+  clips: [{ o: 1, g: 0, x: 284, y: 604, rx: 382, ry: 604 }, { o: 2, g: 0, x: 222, y: 664, rx: 222, ry: 770 }, { o: 3, g: 2, x: 292, y: 826, rx: 371, ry: 826 }, { o: 3, g: 4, x: 474, y: 860, rx: 444, ry: 860 }],
+};
+export const isLetters = L => !!(L && L.theme === 'letters');
 export function normalizeLevel(j) {
-  const L = { name: j.name || '自定义关卡', rings: [], clips: [], errors: [] };
-  (j.rings || []).forEach(r => { if (r && isFinite(r.x) && isFinite(r.y)) L.rings.push({ c: COLORS.includes(r.c) || /^#[0-9a-f]{6}$/i.test(r.c) ? r.c : 'red', x: +r.x, y: +r.y, gap: isFinite(r.gap) ? +r.gap : 90 }); else L.errors.push(r); });
-  (j.clips || []).forEach(c => { if (c && L.rings[c.o] && L.rings[c.g] && c.o !== c.g) L.clips.push({ o: c.o | 0, g: c.g | 0, x: isFinite(c.x) ? +c.x : (L.rings[c.o].x + L.rings[c.g].x) / 2, y: isFinite(c.y) ? +c.y : (L.rings[c.o].y + L.rings[c.g].y) / 2 }); else L.errors.push(c); });
+  const L = { name: j.name || '自定义关卡', rings: [], clips: [], errors: [], theme: j.theme === 'letters' ? 'letters' : 'rings', word: j.word || '' };
+  (j.rings || []).forEach(r => { if (r && isFinite(r.x) && isFinite(r.y)) L.rings.push({ c: COLORS.includes(r.c) || /^#[0-9a-f]{6}$/i.test(r.c) ? r.c : 'red', x: +r.x, y: +r.y, gap: isFinite(r.gap) ? +r.gap : 90, ...(r.ch ? { ch: String(r.ch).toUpperCase().slice(0, 1), rot: +r.rot || 0, h: +r.h || 140 } : {}) }); else L.errors.push(r); });
+  (j.clips || []).forEach(c => { if (c && L.rings[c.o] && L.rings[c.g] && c.o !== c.g) L.clips.push({ o: c.o | 0, g: c.g | 0, x: isFinite(c.x) ? +c.x : (L.rings[c.o].x + L.rings[c.g].x) / 2, y: isFinite(c.y) ? +c.y : (L.rings[c.o].y + L.rings[c.g].y) / 2, ...(isFinite(c.rx) ? { rx: +c.rx, ry: +c.ry } : {}) }); else L.errors.push(c); });
   return L;
 }
+export const levelKey = S => S.theme === 'letters' ? 'levelJsonL' : 'levelJson';
 export function levelFromSettings(S) {
-  if (S.levelJson && S.levelJson.trim()) { try { const L = normalizeLevel(JSON.parse(S.levelJson)); if (L.rings.length) return L; } catch (e) { console.warn('关卡 JSON 无效，使用参考关卡', e); } }
-  return normalizeLevel(REF_LEVEL);
+  const j = S[levelKey(S)], lt = S.theme === 'letters';
+  if (j && j.trim()) { try { const L = normalizeLevel({ ...JSON.parse(j), ...(lt ? { theme: 'letters' } : {}) }); if (L.rings.length) return L; } catch (e) { console.warn('关卡 JSON 无效，使用参考关卡', e); } }
+  return normalizeLevel(lt ? LETTER_LEVEL : REF_LEVEL);
 }
 // 可解性：反复取下“可取下”的环
 export function canFree(L, gone, i, gripLimit = 0) {
   if (gone[i]) return false;
-  for (const c of L.clips) if (c.o === i && !gone[c.g]) return false;
+  for (const c of L.clips) if (c.o === i && !gone[c.g] && !c.rel) return false;
   if (gripLimit > 0) { let n = 0; for (const c of L.clips) if (c.g === i && !gone[c.o]) n++; if (n > gripLimit) return false; }
   return true;
 }
@@ -92,20 +106,28 @@ export class Game {
   freeIds() { return this.rings.filter(r => r.state === 'idle' && this.isFree(r.i)).map(r => r.i); }
   idleIds() { return this.rings.filter(r => r.state === 'idle').map(r => r.i); }
   left() { return this.rings.filter(r => r.state !== 'gone' && r.state !== 'fly').length; }
-  blockers(i) { const g = this.gone(); return this.L.clips.map((c, k) => (c.o === i && !g[c.g]) ? k : -1).filter(k => k >= 0); }
-  grips(i) { const g = this.gone(); return this.L.clips.filter(c => c.g === i && !g[c.o]); }
+  blockers(i) { const g = this.gone(); return this.L.clips.map((c, k) => (c.o === i && !g[c.g] && !c.rel) ? k : -1).filter(k => k >= 0); }
+  grips(i) { const g = this.gone(); return this.L.clips.filter(c => c.g === i && !g[c.o] && !c.rel); }
+  get lt() { return isLetters(this.L); }
+  polys(i) { const b = this.L.rings[i]; return glyphPolys(b.ch, b.h || 140, (b.rot || 0) + this.rings[i].rot); }
+  // 字母主题：飞入顶部单词槽的位置
+  slotOf(i) { const w = (this.L.word || '').toUpperCase(), used = this.rings.filter(r => r.slot != null).map(r => r.slot); let k = -1; for (let j = 0; j < w.length; j++) if (w[j] === this.L.rings[i].ch && !used.includes(j)) { k = j; break; } if (k < 0) k = used.length; return k; }
+  slotXY(k) { const S = this.S, n = Math.max(1, (this.L.word || '').length), w = S.slotW, gp = S.slotGap, x0 = 360 - (n * w + (n - 1) * gp) / 2; return [x0 + k * (w + gp) + w / 2, S.slotY + S.slotH / 2]; }
   // 环 i 当前的屏幕变换（中心 / 旋转° / 缩放 / 不透明度）
   xf(i) {
     const r = this.rings[i], b = this.L.rings[i];
     let rot = r.rot, cx = b.x, cy = b.y, sc = 1, op = 1;
     if (r.shake) { const u = (this.t - r.shake.t0) / r.shake.dur; if (u < 1) rot += this.S.shakeDeg * Math.sin(u * Math.PI * 5) * (1 - u); }
     const a = rad(rot), dx = b.x - r.px, dy = b.y - r.py; cx = r.px + dx * Math.cos(a) - dy * Math.sin(a); cy = r.py + dx * Math.sin(a) + dy * Math.cos(a);
-    if (r.fly) { const S = this.S, u = clamp((this.t - r.fly.t0) / r.fly.dur, 0, 1), e = 1 - Math.pow(1 - u, 2.2); cx += r.fly.dx * S.flyDist * e; cy += r.fly.dy * S.flyDist * e - S.flyLift * e; rot += r.fly.spin * e; sc = 1 + (S.flyScale - 1) * Math.sin(Math.min(1, u * 1.6) * Math.PI / 2); op = 1 - clamp(u / 0.9, 0, 1); }
+    if (r.fly && r.fly.slot == null) { const S = this.S, u = clamp((this.t - r.fly.t0 - (S.flyDelay || 0) / 1000) / r.fly.dur, 0, 1), e = 1 - Math.pow(1 - u, 2.2); cx += r.fly.dx * S.flyDist * e; cy += r.fly.dy * S.flyDist * e - S.flyLift * e; rot += r.fly.spin * e; sc = 1 + (S.flyScale - 1) * Math.sin(Math.min(1, u * 1.6) * Math.PI / 2); op = 1 - clamp(u / 0.9, 0, 1); }
+    if (r.fly && r.fly.slot != null) { const S = this.S, u = clamp((this.t - r.fly.t0 - (S.flyDelay || 0) / 1000) / r.fly.dur, 0, 1), e = u * u * (3 - 2 * u), [sx, sy] = this.slotXY(r.fly.slot), b0 = this.L.rings[i];
+      const lift = Math.sin(u * Math.PI) * S.letterArc; cx = b0.x + (sx - b0.x) * e; cy = b0.y + (sy - b0.y) * e - lift; sc = 1 + (S.slotScale - 1) * e; rot = r.rot * (1 - e); op = 1; }
     if (r.state === 'gone') op = 0;
     return { x: cx, y: cy, rot, sc, op };
   }
   hitTest(x, y, R, tube, pad) {
     let best = -1, bd = 1e9;
+    if (this.lt) { for (const r of this.rings) { if (r.state !== 'idle') continue; const b = this.L.rings[r.i], q = glyphNearest(this.polys(r.i), x - b.x, y - b.y); if (q.d < this.S.letterTube + pad + 10 && q.d < bd) { bd = q.d; best = r.i; } } return best; }
     for (const r of this.rings) { if (r.state !== 'idle') continue; const f = this.xf(r.i), d = Math.hypot(x - f.x, y - f.y), e = Math.abs(d - R); if (e < tube + pad && e < bd) { bd = e; best = r.i; } }
     if (best < 0) for (const r of this.rings) { if (r.state !== 'idle') continue; const f = this.xf(r.i), d = Math.hypot(x - f.x, y - f.y); if (d < R && d < bd) { bd = d; best = r.i; } }
     return best;
@@ -113,18 +135,28 @@ export class Game {
   press(i, x, y) {
     const r = this.rings[i]; if (!r || r.state !== 'idle') return null;
     const free = this.isFree(i), gr = this.grips(i);
-    if (free && gr.length) { r.px = gr.reduce((s, c) => s + c.x, 0) / gr.length; r.py = gr.reduce((s, c) => s + c.y, 0) / gr.length; } else { r.px = this.L.rings[i].x; r.py = this.L.rings[i].y; }
-    r.shake = null; this.drag = { i, free, a0: Math.atan2(y - r.py, x - r.px), x0: x, y0: y, moved: 0 };
+    if (this.lt) { r.px = this.L.rings[i].x; r.py = this.L.rings[i].y; } else if (free && gr.length) { r.px = gr.reduce((s, c) => s + c.x, 0) / gr.length; r.py = gr.reduce((s, c) => s + c.y, 0) / gr.length; } else { r.px = this.L.rings[i].x; r.py = this.L.rings[i].y; }
+    r.shake = null; this.drag = { i, free, a0: Math.atan2(y - r.py, x - r.px), x0: x, y0: y, moved: 0, base: r.rot, cum: 0, last: Math.atan2(y - r.py, x - r.px), rel: 0 };
     this.events.push({ type: 'grab', i }); return this.drag;
   }
   move(x, y) {
     const D = this.drag; if (!D) return; const r = this.rings[D.i];
     D.moved = Math.max(D.moved, Math.hypot(x - D.x0, y - D.y0));
     let da = Math.atan2(y - r.py, x - r.px) - D.a0; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
+    if (this.lt) { // 字母：可连续旋转（C 转到缺口对准米珠即可脱扣）；其他字母只做小幅晃动
+      const an = Math.atan2(y - r.py, x - r.px); let d = an - D.last; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; D.last = an; D.cum += d;
+      const b = this.L.rings[D.i], spin = b.ch === 'C' || b.ch === 'O'; const mx = spin ? 1e9 : (D.free ? this.S.dragMaxDeg : this.S.blockMaxDeg);
+      r.rot = D.base + clamp(D.cum * 180 / Math.PI * (spin ? 1 : this.S.dragFollow), -mx, mx);
+      if (b.ch === 'C') this.L.clips.forEach((c, k) => { if (c.g !== D.i || c.rel || this.gone()[c.o]) return; const phi = Math.atan2(c.y - b.y, c.x - b.x) * 180 / Math.PI, gd = (b.rot || 0) + r.rot; let df = ((phi - gd) % 360 + 540) % 360 - 180; if (Math.abs(df) < this.S.releaseDeg) { c.rel = true; D.rel++; this.events.push({ type: 'release', k }); } });
+      return;
+    }
     const mx = D.free ? this.S.dragMaxDeg : this.S.blockMaxDeg; r.rot = clamp(da * 180 / Math.PI * this.S.dragFollow, -mx, mx);
   }
   release() {
     const D = this.drag; if (!D) return null; this.drag = null; const r = this.rings[D.i];
+    if (this.lt && D.rel) return { ok: true, i: D.i, rel: true }; // 本次旋转只脱开了扣子：停在当前角度
+    if (this.lt && this.L.rings[D.i].ch === 'C' && this.isFree(D.i) && this.grips(D.i).length) return { ok: true, i: D.i, rel: false };
+    if (this.lt && this.isFree(D.i)) { r.slot = this.slotOf(D.i); r.state = 'fly'; r.fly = { t0: this.t, dur: this.S.letterFlyDur / 1000, slot: r.slot }; this.events.push({ type: 'pop', i: D.i }); return { ok: true, i: D.i }; }
     if (D.free && this.isFree(D.i)) {
       const b = this.L.rings[D.i], f = this.xf(D.i); let dx = f.x - r.px, dy = f.y - r.py;
       { const c = this.centroid(); dx = b.x - c[0]; dy = b.y - c[1]; } // 参考：沿远离画面中心方向弹出
@@ -132,7 +164,7 @@ export class Game {
       r.state = 'fly'; r.fly = { t0: this.t, dur: this.S.flyDur / 1000, dx: dx / n, dy: dy / n, spin: this.S.flySpin * sgn };
       this.events.push({ type: 'pop', i: D.i }); return { ok: true, i: D.i };
     }
-    r.rot = 0; r.shake = { t0: this.t, dur: this.S.shakeDur / 1000 };
+    r.rot = this.lt ? D.base : 0; r.shake = { t0: this.t, dur: this.S.shakeDur / 1000 };
     if (this.S.blockFlash) for (const k of this.blockers(D.i)) this.clipFlash[k] = this.t;
     this.events.push({ type: 'block', i: D.i }); return { ok: false, i: D.i };
   }
@@ -140,9 +172,9 @@ export class Game {
   update(dt) {
     this.t += dt;
     for (const r of this.rings) {
-      if (r.state === 'fly' && this.t - r.fly.t0 >= r.fly.dur) r.state = 'gone';
+      if (r.state === 'fly' && this.t - r.fly.t0 >= r.fly.dur + (this.S.flyDelay || 0) / 1000) { r.state = 'gone'; if (r.slot != null) this.events.push({ type: 'slot', i: r.i, k: r.slot }); }
       if (r.shake && this.t - r.shake.t0 >= r.shake.dur) r.shake = null;
-      if (!this.drag || this.drag.i !== r.i) { if (r.state === 'idle' && !r.shake && r.rot) r.rot *= Math.exp(-dt * 14); }
+      if (!this.drag || this.drag.i !== r.i) { if (r.state === 'idle' && !r.shake && r.rot && !this.lt) r.rot *= Math.exp(-dt * 14); }
     }
     if (this.winT == null && this.rings.every(r => r.state === 'gone')) { this.winT = this.t; this.events.push({ type: 'win' }); }
   }

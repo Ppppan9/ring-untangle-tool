@@ -12,3 +12,16 @@ export const REF_SEQ = [
 ];
 export const REF_END = 20.6;
 export const REF_HAND0 = { x: 73, y: 473 }; // 第 0 帧笔尖位置（设计坐标 720×1280）
+// 字母型解锁参考（letters_ref.mp4 第 5 关 LUNCH，38.0 s 为第 0 帧）：0.3–2.6 顺时针转 C 让缺口对准右侧米珠 → 2.6 H 脱出飞入槽；3.0–5.0 继续转 C 到底部米珠 → 5.2 C 飞走；5.6 U；6.4 N；6.7 L
+// 索引：0 C, 1 H, 2 U, 3 L, 4 N；sw = 本步旋转角度(°)
+export const LETTER_SEQ = [
+  { t: 0.3, i: 0, d: 2.2, ga: -90, dir: 1, sw: 185 },
+  { t: 2.6, i: 1, d: 0.25, ga: -90, dir: 1, sw: 6 },
+  { t: 3.0, i: 0, d: 2.0, ga: 0, dir: 1, sw: 95 },
+  { t: 5.1, i: 0, d: 0.2, ga: 0, dir: 1, sw: 4 },
+  { t: 5.6, i: 2, d: 0.25, ga: -90, dir: 1, sw: 6 },
+  { t: 6.4, i: 4, d: 0.2, ga: -90, dir: 1, sw: 6 },
+  { t: 6.7, i: 3, d: 0.2, ga: -90, dir: 1, sw: 6 },
+];
+export const LETTER_END = 8.5;
+export const LETTER_HAND0 = { x: 560, y: 1120 };
