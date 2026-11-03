@@ -36,7 +36,7 @@ export function createAERecorder(api) {
     for (const tr of tracks) {
       // 拆成连续出现段
       let a0 = 0; const segs = []; for (let i = 1; i <= tr.s.length; i++) if (i === tr.s.length || tr.s[i][6] !== tr.s[i - 1][6] + 1) { segs.push(tr.s.slice(a0, i)); a0 = i; }
-      segs.forEach((s, n) => {
+      segs.forEach((s, n) => { if (!A[tr.asset]) return; // 主题/关卡切换后旧轨道无素材：跳过
         const a = asset(tr.asset), fr = resample(s), tin = fr.f0 / fps, last = s[s.length - 1], tout = Math.min(D, Math.max(tin + 1 / fps, Math.round((rec.frames - 1 > last[6] ? last[0] + 1 / fps : D) * fps) / fps));
         layers.push({ name: api.layerName(tr.id, zh) + (segs.length > 1 ? ` #${n + 1}` : ''), src: { asset: tr.asset }, in: r4(tin), out: r4(tout), label: tr.id.startsWith('ring') ? 9 : tr.id === 'hand' ? 12 : 5, tr: {
           anchor: rnd([a.ax, a.ay]), position: prop(fr, e => [e[1], e[2]], 0.25), scale: prop(fr, e => [e[3] * 100 * (a.k || 1), e[3] * 100 * (a.k || 1)], 0.25), rotation: prop(fr, e => e[4], 0.2), opacity: prop(fr, e => Math.max(0, Math.min(100, e[5] * 100)), 0.5) } });
