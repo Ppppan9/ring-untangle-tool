@@ -160,7 +160,7 @@ function drawRings(g, only = -1, X = null) {
   if (SH.a > 0) { g.save(); g.globalAlpha = SH.a; g.filter = `blur(${SH.b * K}px)`; g.drawImage(sil, SH.dx * K, SH.dy * K); g.restore(); }
   if (CY && S.candyContact > 0) { g.save(); g.globalAlpha = S.candyContact; g.filter = `blur(${2 * K}px)`; g.drawImage(sil, 2 * K, 3 * K); g.restore(); }
   if (S.aoAmount > 0) { g.save(); g.globalAlpha = S.aoAmount; g.filter = `blur(${S.aoBlur * K}px)`; g.drawImage(sil, 0, S.aoBlur * K * 0.4); g.restore(); }
-  if (S.depthBlur > 0) { // 上方景深：上半部分用模糊版，向下渐变到清晰
+  if (S.depthBlur > 0 && !CY) { // 糖果：参考无景深，关闭（否则顶部 A 偏灰偏绿） // 上方景深：上半部分用模糊版，向下渐变到清晰
     const bl = tmpC('bl', W, H), bg2 = bl.getContext('2d'); bg2.globalCompositeOperation = 'copy'; bg2.filter = `blur(${S.depthBlur * K}px)`; bg2.drawImage(c3, 0, 0, W, H); bg2.filter = 'none';
     const y1 = (S.depthBlurY - view.y0) * K, gr = bg2.createLinearGradient(0, 0, 0, Math.max(1, y1)); gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(0.55, 'rgba(0,0,0,0.85)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
     const sh = tmpC('sh', W, H), shg = sh.getContext('2d'); shg.globalCompositeOperation = 'copy'; shg.drawImage(c3, 0, 0, W, H); shg.globalCompositeOperation = 'destination-out'; shg.fillStyle = gr; shg.fillRect(0, 0, W, Math.max(1, y1)); shg.globalCompositeOperation = 'source-over';
