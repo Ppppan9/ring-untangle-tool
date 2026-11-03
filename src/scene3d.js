@@ -87,7 +87,7 @@ export class Scene3D {
   // 字母主题：每个字母 = 若干管状笔画（直线 / 圆弧，端点与拐角用球补圆）；扣子 = 米色珠（套在被扣字母笔画上）+ 黑色细杆（连到主人字母）
   buildLetters(L, S, mkMat, q, W, wc) {
     const r = S.letterTube, cap = new THREE.SphereGeometry(r, Math.round(32 * q), Math.round(20 * q));
-    const br = r * S.beadR, bl = r * S.beadLen, bead = sleeveGeom(br, bl / 2, Math.min(br, bl / 2) * S.sleeveBevel, Math.round(36 * q)), rod = new THREE.CylinderGeometry(S.rodR, S.rodR, 1, 16);
+    const sr = r * S.sleeveR, sl = r * S.sleeveLen, bead = sleeveGeom(sr, sl / 2, Math.min(sr, sl / 2) * S.sleeveBevel, Math.round(40 * q)), rod = new THREE.CylinderGeometry(r * 0.92, r * 0.92, 1, Math.round(24 * q));
     const ball = new THREE.SphereGeometry(r * 0.75, 24, 16);
     L.rings.forEach((b, i) => {
       const g = new THREE.Group(); g.userData.i = i; const mat = mkMat(colorOf(S, b.c), false, S['hl_' + b.c] ?? 1); g.userData.mats = [mat];
@@ -102,12 +102,12 @@ export class Scene3D {
     // 扣子挂在主人字母组里（随主人移动/飞走）；珠轴 = 被扣字母该点切线
     L.clips.forEach((c, k) => {
       const o = L.rings[c.o], gb = L.rings[c.g], go = this.groups[c.o]; if (!go) return;
-      const bm = mkMat(W ? wc : S.beadColor, true); bm.emissive = new THREE.Color(W ? wc : S.beadColor); go.userData.mats.push(bm); this.clipMeshes[k] = bm;
-      const rm = new THREE.MeshPhysicalMaterial({ color: W ? wc : S.rodColor, roughness: 0.35, metalness: 0.6, clearcoat: 0.5 }); go.userData.mats.push(rm);
-      const tg = glyphNearest(glyphPolys(gb.ch, gb.h || 140, gb.rot || 0), c.x - gb.x, c.y - gb.y);
+      const bm = mkMat(clipColor(S, o.c), true); bm.emissive = new THREE.Color(W ? wc : colorOf(S, o.c)); go.userData.mats.push(bm); this.clipMeshes[k] = bm; // 套管扣子：沿用环形主题的金色/同色光泽套管 + 同材质短柄
+      const rm = bm;
+      const tg = glyphNearest(glyphPolys(gb.ch, gb.h || 140, gb.rot || 0), c.x - gb.x, c.y - gb.y), qo = glyphNearest(glyphPolys(o.ch, o.h || 140, o.rot || 0), (c.rx ?? c.x) - o.x, (c.ry ?? c.y) - o.y);
       const lx = c.x - o.x, ly = -(c.y - o.y), mb = new THREE.Mesh(bead, bm); mb.position.set(lx, ly, 0); mb.rotation.z = -tg.ang - Math.PI / 2; mb.castShadow = mb.receiveShadow = true; go.add(mb);
-      const ex = (c.rx ?? o.x) - o.x, ey = -((c.ry ?? o.y) - o.y), dx = ex - lx, dy = ey - ly, len = Math.hypot(dx, dy);
-      if (len > 1) { const st = new THREE.Mesh(rod, rm); st.scale.y = len; st.position.set((lx + ex) / 2, (ly + ey) / 2, 0); st.rotation.z = Math.atan2(dy, dx) - Math.PI / 2; st.castShadow = true; go.add(st); }
+      const ex = qo.x, ey = -qo.y, dx = ex - lx, dy = ey - ly, len = Math.hypot(dx, dy);
+      if (len > sr * 0.6) { const st = new THREE.Mesh(rod, rm); st.scale.y = Math.max(1, len - sr * 0.5); st.position.set((lx + ex) / 2, (ly + ey) / 2, 0); st.rotation.z = Math.atan2(dy, dx) - Math.PI / 2; st.castShadow = true; go.add(st); }
     });
   }
   // 影棚环境：暗底 + 发光柔光箱条（顶部长条 / 左右竖条 / 暖色地面反光）→ PMREM，让金属管沿长度出现明亮清晰的反光条和暗带

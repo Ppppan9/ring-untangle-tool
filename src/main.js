@@ -4,7 +4,7 @@ import { Game, levelKey, LETTER_LEVEL, levelFromSettings, solveLevel, normalizeL
 import { Scene3D, colorOf } from './scene3d.js';
 import { glyphPolys, glyphNearest } from './glyphs.js';
 import { Sfx } from './audio.js';
-import { REF_SEQ, REF_HAND0, LETTER_SEQ, LETTER_HAND0 } from './refseq.js';
+import { REF_SEQ, REF_HAND0, LETTER_SEQS, LETTER_HAND0 } from './refseq.js';
 import { createAERecorder } from './ae/recorder.js';
 import { makeZip } from './ae/zip.js';
 import { DEFAULT_HAND } from './default_hand.js';
@@ -33,7 +33,7 @@ const BX = x => BCX + (x - BCX) * bs() + S.boardX, BY = y => BCY + (y - BCY) * b
 const IBX = x => (x - S.boardX - BCX) / bs() + BCX, IBY = y => (y - S.boardY - BCY) / bs() + BCY;
 const geoS = () => ({ ...S, ringR: S.ringR * bs(), tubeR: S.tubeR * bs(), clipSize: S.clipSize * bs() });
 function placeLevel(lv) { return { name: lv.name, rings: lv.rings.map(r => ({ ...r, x: BX(r.x), y: BY(r.y) })), clips: lv.clips.map(c => ({ ...c, x: BX(c.x), y: BY(c.y), ...(c.rx != null ? { rx: BX(c.rx), ry: BY(c.ry) } : {}) })), theme: lv.theme, word: lv.word }; }
-const isRefLevel = () => { const j = S[levelKey(S)]; return !(j && j.trim()); };
+const isRefLevel = () => { const j = S[levelKey(S)]; return !(j && j.trim()) && (S.theme !== 'letters' || (!!LETTER_SEQS[String(S.word).toUpperCase()] && !S.wordSeed)); };
 const LT = () => !!(L && L.theme === 'letters');
 function rebuild() {
   if (cv.width !== S.canvasW || cv.height !== S.canvasH) { cv.width = S.canvasW; cv.height = S.canvasH; }
@@ -90,7 +90,7 @@ function directorStep(h) {
   if (G.winT != null) return;
   if (!auto.plan) {
     let st = null;
-    if (auto.mode === 'ref') { const SEQ = LT() ? LETTER_SEQ : REF_SEQ; if (auto.idx < SEQ.length) { const q = SEQ[auto.idx++]; st = { ...q, at: q.t / sp, d: q.d / sp }; } else auto.mode = 'solver'; }
+    if (auto.mode === 'ref') { const SEQ = LT() ? LETTER_SEQS[String(S.word).toUpperCase()] || [] : REF_SEQ; if (auto.idx < SEQ.length) { const q = SEQ[auto.idx++]; st = { ...q, at: q.t / sp, d: q.d / sp }; } else auto.mode = 'solver'; }
     if (auto.mode === 'solver') {
       if (G.rings.some(r => r.state === 'fly')) return;
       const free = G.freeIds(); if (!free.length) { status('⚠ 没有可取下的环（关卡卡死）'); stopAuto(); return; }
@@ -227,19 +227,36 @@ cv.addEventListener('pointercancel', () => { pd = null; hand.follow = null; if (
 cv.addEventListener('pointerleave', () => { if (!auto && !pd) hand.visible = false; });
 
 // ---------- 关卡编辑器 ----------
+const ED_TOOLS_L = [['move', '拖动字母(靠近套管自动穿入)'], ['rodS', '短杆+套管'], ['rodL', '长杆+套管'], ['gap', '旋转15°'], ['color', '改色'], ['erase', '删除']];
 const ED_TOOLS = [['move', '移动环/扣'], ['add', '加环'], ['gap', '旋转缺口'], ['color', '改色'], ['link', '连扣(先点主人再点被扣)'], ['erase', '删除']];
 function openEditor() { stopAuto(); newGame(); editor = { tool: 'move', color: 'red', lv: JSON.parse(JSON.stringify({ name: level.name, rings: level.rings, clips: level.clips, theme: level.theme, word: level.word })), ch: 'A', drag: null, link: -1 }; buildEditBar(); toast('关卡编辑器：拖动环或扣子移动；工具栏切换加环 / 缺口 / 改色 / 连扣 / 删除', 3000); }
 function closeEditor(save = true) { if (!editor) return; const lv = editor.lv; editor = null; const bar = document.getElementById('editBar'); if (bar) bar.remove(); if (save) { S[levelKey(S)] = JSON.stringify({ name: lv.name && lv.name !== '参考关卡' ? lv.name : '自定义关卡', rings: lv.rings, clips: lv.clips, theme: lv.theme, word: lv.word }); saveSettings(S); buildPanel(); } newGame(); }
 function edRefresh() { level = normalizeLevel(editor.lv); L = placeLevel(level); G = new Game(L, S); const n = document.getElementById('edInfo'); if (n) { const s = solveLevel(level, S.gripLimit); editor.stuck = s.stuck; n.textContent = `${level.rings.length} 个环 · ${level.clips.length} 个扣 · ${s.solvable ? '✔ 可全部解开（顺序 ' + s.order.join('→') + '）' : `✖ 不可解：${s.stuck.length} 个环卡死（红圈）`}`; } }
 function edHitRing(x, y) { const lx = IBX(x), ly = IBY(y); if (editor.lv.theme === 'letters') { let b = -1, bd = S.letterTube + 14; editor.lv.rings.forEach((r, i) => { const q = glyphNearest(glyphPolys(r.ch, r.h || 140, r.rot || 0), lx - r.x, ly - r.y); if (q.d < bd) { bd = q.d; b = i; } }); return b; } let best = -1, bd = S.ringR + S.tubeR + 10; editor.lv.rings.forEach((r, i) => { const d = Math.abs(Math.hypot(lx - r.x, ly - r.y) - S.ringR); if (d < S.tubeR + 14 && d < bd) { bd = d; best = i; } }); if (best < 0) editor.lv.rings.forEach((r, i) => { const d = Math.hypot(lx - r.x, ly - r.y); if (d < S.ringR * 0.8 && d < bd) { bd = d; best = i; } }); return best; }
 function edHitClip(x, y) { const lx = IBX(x), ly = IBY(y); let best = -1, bd = S.clipSize * 0.9; editor.lv.clips.forEach((c, k) => { const d = Math.hypot(lx - c.x, ly - c.y); if (d < bd) { bd = d; best = k; } }); return best; }
+// ---------- 字母关卡编辑：输入字母生成 3D 字母；杆件面板（短/长杆）拖到字母上 → 半透明吸附预览 → 松手固定杆端；
+// 另一端为套管，拖动别的字母靠近 → 判断该字母有笔画能穿过套管（距离/方向）→ 绿色预览，松手自动穿入；否则红色提示
+const edPolys = r => glyphPolys(r.ch, r.h || 140, r.rot || 0);
+function edAddLetters(txt) { const lv = editor.lv, w = String(txt || '').toUpperCase().replace(/[^A-Z]/g, ''); if (!w) return toast('请输入 A–Z 字母');
+  [...w].forEach((ch, k) => lv.rings.push({ c: ['yellow', 'pink', 'teal', 'orange', 'purple', 'blue', 'green', 'red'][lv.rings.length % 8], ch, x: Math.round(360 - (w.length - 1) * 75 + k * 150), y: 640 + (lv.rings.length >= 4 ? 220 : 0), rot: 0, h: 140 }));
+  lv.word = lv.word || lv.rings.map(r => r.ch).join(''); edRefresh(); toast(`已生成 ${w.length} 个字母`); }
+function edRodGhost(lx, ly, len) { const lv = editor.lv; let best = null; lv.rings.forEach((r, i) => { const q = glyphNearest(edPolys(r), lx - r.x, ly - r.y); if (q.d < 60 && (!best || q.d < best.d)) best = { i, q, d: q.d, r }; });
+  if (!best) return { ok: false, x: lx, y: ly, bx: lx + len, by: ly };
+  const { q, r } = best, ax = r.x + q.x, ay = r.y + q.y; let nx = -Math.sin(q.ang), ny = Math.cos(q.ang); if ((lx - ax) * nx + (ly - ay) * ny < 0) { nx = -nx; ny = -ny; } if (Math.hypot(lx - ax, ly - ay) < 4) { nx = Math.cos(q.ang + Math.PI / 2); ny = Math.sin(q.ang + Math.PI / 2); }
+  return { ok: true, o: best.i, x: ax, y: ay, bx: ax + nx * len, by: ay + ny * len, ang: Math.atan2(ny, nx) }; }
+function edThreadCheck(i) { // 字母 i 是否有笔画能穿过某个空套管：笔画到套管中心距离 < 套管半径，且笔画方向与杆方向夹角 > 35°（能从套管里穿过）
+  const lv = editor.lv, r = lv.rings[i], sr = S.letterTube * S.sleeveR; let best = null;
+  lv.clips.forEach((c, k) => { if (c.g >= 0 || c.o === i) return; const q = glyphNearest(edPolys(r), c.x - r.x, c.y - r.y); if (q.d > sr * 3.2) return; const rodA = Math.atan2(c.y - c.ry, c.x - c.rx); let da = Math.abs(((q.ang - rodA) * 180 / Math.PI % 180 + 180) % 180); da = Math.min(da, 180 - da);
+    const ok = q.d < sr * 1.6 && da > 35; if (!best || q.d < best.q.d) best = { k, q, ok, dx: c.x - (r.x + q.x), dy: c.y - (r.y + q.y) }; });
+  return best; }
 function editorDown(x, y) {
+  if (editor.lv.theme === 'letters' && (editor.tool === 'rodS' || editor.tool === 'rodL')) { const len = editor.tool === 'rodS' ? 60 : (editor.rodLen || 130); editor.rod = { len, ghost: edRodGhost(IBX(x), IBY(y), len) }; return; }
   const T = editor.tool, lv = editor.lv, lx = IBX(x), ly = IBY(y);
   const LTE = lv.theme === 'letters';
   if (T === 'add' && LTE) { lv.rings.push({ c: editor.color, ch: (editor.ch || 'A').toUpperCase(), x: Math.round(lx), y: Math.round(ly), rot: 0, h: 140 }); lv.word = lv.rings.map(r => r.ch).join(''); edRefresh(); return; }
   if (T === 'add') { lv.rings.push({ c: editor.color, x: Math.round(lx), y: Math.round(ly), gap: 90 }); edRefresh(); return; }
   const k = edHitClip(x, y), i = edHitRing(x, y);
-  if (T === 'move') { if (k >= 0) editor.drag = { k, dx: lv.clips[k].x - lx, dy: lv.clips[k].y - ly }; else if (i >= 0) editor.drag = { i, x0: lx, y0: ly, r0: { x: lv.rings[i].x, y: lv.rings[i].y }, c0: lv.clips.map(c => c.o === i ? [c.x, c.y] : null) }; return; }
+  if (T === 'move') { if (k >= 0) editor.drag = { k, dx: lv.clips[k].x - lx, dy: lv.clips[k].y - ly }; else if (i >= 0) editor.drag = { i, x0: lx, y0: ly, r0: { x: lv.rings[i].x, y: lv.rings[i].y }, c0: lv.clips.map(c => c.o === i ? [c.x, c.y, c.rx, c.ry] : null) }; return; }
   if (T === 'erase') { if (k >= 0) lv.clips.splice(k, 1); else if (i >= 0) { lv.rings.splice(i, 1); lv.clips = lv.clips.filter(c => c.o !== i && c.g !== i).map(c => ({ ...c, o: c.o > i ? c.o - 1 : c.o, g: c.g > i ? c.g - 1 : c.g })); } edRefresh(); return; }
   if (i < 0) return;
   if (T === 'gap' && LTE) { lv.rings[i].rot = ((lv.rings[i].rot || 0) + 45) % 360; }
@@ -249,22 +266,34 @@ function editorDown(x, y) {
   else if (T === 'link') { if (editor.link < 0) { editor.link = i; toast('已选主人环，再点被扣住的环'); return; } if (editor.link !== i) { const a = lv.rings[editor.link], b = lv.rings[i], p1 = circleX(a, b, S.ringR, 1), p2 = circleX(a, b, S.ringR, -1), p = Math.hypot(p1.x - lx, p1.y - ly) < Math.hypot(p2.x - lx, p2.y - ly) ? p1 : p2; lv.clips = lv.clips.filter(c => !((c.o === editor.link && c.g === i) || (c.o === i && c.g === editor.link))); lv.clips.push({ o: editor.link, g: i, x: Math.round(p.x), y: Math.round(p.y) }); } editor.link = -1; }
   edRefresh();
 }
-function editorMove(x, y) { const D = editor && editor.drag; if (!D) return; const lv = editor.lv, lx = IBX(x), ly = IBY(y); if (D.k != null) { lv.clips[D.k].x = Math.round(lx + D.dx); lv.clips[D.k].y = Math.round(ly + D.dy); } else { const dx = lx - D.x0, dy = ly - D.y0; lv.rings[D.i].x = Math.round(D.r0.x + dx); lv.rings[D.i].y = Math.round(D.r0.y + dy); lv.clips.forEach((c, k) => { if (D.c0[k]) { c.x = Math.round(D.c0[k][0] + dx); c.y = Math.round(D.c0[k][1] + dy); } }); } level = normalizeLevel(lv); L = placeLevel(level); G = new Game(L, S); }
-function editorUp() { if (editor && editor.drag) { editor.drag = null; edRefresh(); } }
+function editorMove(x, y) {
+  if (editor && editor.rod) { editor.rod.ghost = edRodGhost(IBX(x), IBY(y), editor.rod.len); return; }
+  const D = editor && editor.drag; if (!D) return; const lv = editor.lv, lx = IBX(x), ly = IBY(y); if (D.k != null) { lv.clips[D.k].x = Math.round(lx + D.dx); lv.clips[D.k].y = Math.round(ly + D.dy); } else { const dx = lx - D.x0, dy = ly - D.y0; lv.rings[D.i].x = Math.round(D.r0.x + dx); lv.rings[D.i].y = Math.round(D.r0.y + dy); lv.clips.forEach((c, k) => { if (D.c0[k]) { c.x = Math.round(D.c0[k][0] + dx); c.y = Math.round(D.c0[k][1] + dy); if (D.c0[k][2] != null) { c.rx = Math.round(D.c0[k][2] + dx); c.ry = Math.round(D.c0[k][3] + dy); } } else if (lv.theme === 'letters' && c.g === D.i && Math.hypot(dx, dy) > 30) c.g = -1; }); if (lv.theme === 'letters') editor.thread = edThreadCheck(D.i); } level = normalizeLevel(lv); L = placeLevel(level); G = new Game(L, S); }
+function editorUp() {
+  if (editor && editor.rod) { const g = editor.rod.ghost; editor.rod = null; if (g.ok) { editor.lv.clips.push({ o: g.o, g: -1, rx: Math.round(g.x), ry: Math.round(g.y), x: Math.round(g.bx), y: Math.round(g.by) }); toast('杆端已固定在 ' + editor.lv.rings[g.o].ch + '，拖动另一个字母穿入套管'); } else toast('⚠ 请把杆拖到字母笔画上'); edRefresh(); return; }
+  if (editor && editor.drag) { const D = editor.drag; editor.drag = null; editor.thread = null;
+    if (editor.lv.theme === 'letters' && D.i != null) { const lv = editor.lv, t = edThreadCheck(D.i); if (t && t.ok) { lv.rings[D.i].x = Math.round(lv.rings[D.i].x + t.dx); lv.rings[D.i].y = Math.round(lv.rings[D.i].y + t.dy); lv.clips[t.k].g = D.i; toast(`✔ ${lv.rings[D.i].ch} 已穿入套管`); } else if (t) toast('✖ 该位置笔画无法穿过套管（方向/距离不合适）'); }
+    edRefresh(); } }
 function drawEditor(g) {
   g.lineWidth = 3;
+  if (editor.lv.theme === 'letters') { const sr = S.letterTube * S.sleeveR, P = (x, y) => [BX(x), BY(y)];
+    const rodDraw = (ax, ay, bx, by, col, a) => { g.save(); g.globalAlpha = a; g.strokeStyle = col; g.lineCap = 'round'; g.lineWidth = S.letterTube * 1.8 * bs(); g.beginPath(); g.moveTo(...P(ax, ay)); g.lineTo(...P(bx, by)); g.stroke(); g.fillStyle = col; g.beginPath(); g.arc(...P(bx, by), sr * bs(), 0, 7); g.fill(); g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = 2; g.beginPath(); g.arc(...P(bx, by), sr * 0.55 * bs(), 0, 7); g.stroke(); g.restore(); };
+    editor.lv.clips.forEach(c => { if (c.g < 0) rodDraw(c.rx, c.ry, c.x, c.y, S.col_gold || '#e6b24a', 0.95); });
+    if (editor.rod) { const q = editor.rod.ghost; rodDraw(q.x, q.y, q.bx, q.by, q.ok ? '#e6b24a' : '#ff3b3b', 0.4); }
+    if (editor.thread) { const t = editor.thread, c = editor.lv.clips[t.k]; g.save(); g.strokeStyle = t.ok ? '#18c95a' : '#ff3b3b'; g.lineWidth = 5; g.setLineDash([8, 6]); g.beginPath(); g.arc(...P(c.x, c.y), sr * 1.9 * bs(), 0, 7); g.stroke(); g.restore(); }
+    return; }
   L.clips.forEach(c => { const o = L.rings[c.o], gg = L.rings[c.g]; g.strokeStyle = 'rgba(0,0,0,0.35)'; g.setLineDash([6, 6]); g.beginPath(); g.moveTo(o.x, o.y); g.lineTo(c.x, c.y); g.lineTo(gg.x, gg.y); g.stroke(); g.setLineDash([]); });
   L.rings.forEach((r, i) => { g.fillStyle = 'rgba(0,0,0,0.55)'; g.font = 'bold 22px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(i), r.x, r.y); if (editor.stuck && editor.stuck.includes(i)) { g.strokeStyle = '#ff2d3d'; g.beginPath(); g.arc(r.x, r.y, S.ringR * bs() + S.tubeR * bs() + 6, 0, 7); g.stroke(); } if (editor.link === i) { g.strokeStyle = '#ffd54a'; g.lineWidth = 5; g.beginPath(); g.arc(r.x, r.y, S.ringR * bs() + 20, 0, 7); g.stroke(); g.lineWidth = 3; } });
 }
 function buildEditBar() {
   let bar = document.getElementById('editBar'); if (bar) bar.remove(); bar = document.createElement('div'); bar.id = 'editBar';
-  bar.innerHTML = `<b>✏ 关卡编辑</b> <span class="seg" id="edTools">${ED_TOOLS.map(([k, t]) => `<button data-t="${k}" class="${k === 'move' ? 'on' : ''}">${t}</button>`).join('')}</span>
+  bar.innerHTML = `<b>✏ 关卡编辑</b> <span class="seg" id="edTools">${(L.theme === 'letters' ? ED_TOOLS_L : ED_TOOLS).map(([k, t]) => `<button data-t="${k}" class="${k === 'move' ? 'on' : ''}">${t}</button>`).join('')}</span>
   <span class="seg" id="edCols">${COLORS.map(c => `<button data-c="${c}" class="${c === 'red' ? 'on' : ''}" style="color:${S['col_' + c]}">●${COLOR_ZH[c]}</button>`).join('')}</span>
-  ${L.theme === 'letters' ? `字母<input id="edCh" maxlength="1" value="A" style="width:28px"> 单词<input id="edWord" value="${L.word || ''}" style="width:90px">` : ''}<button id="edClear">清空</button><button id="edDone" class="primary">✔ 完成并试玩</button><button id="edCancel">取消</button><div id="edInfo"></div>`;
+  ${L.theme === 'letters' ? `生成字母<input id="edCh" maxlength="8" placeholder="输入字母" style="width:80px"><button id="edGen">＋生成</button> 杆长<input id="edRod" type="number" value="130" style="width:50px"> 单词<input id="edWord" value="${L.word || ''}" style="width:90px">` : ''}<button id="edClear">清空</button><button id="edDone" class="primary">✔ 完成并试玩</button><button id="edCancel">取消</button><div id="edInfo"></div>`;
   document.getElementById('stageWrap').append(bar);
   bar.querySelectorAll('#edTools button').forEach(b => b.onclick = () => { editor.tool = b.dataset.t; editor.link = -1; bar.querySelectorAll('#edTools button').forEach(x => x.classList.toggle('on', x === b)); });
   bar.querySelectorAll('#edCols button').forEach(b => b.onclick = () => { editor.color = b.dataset.c; bar.querySelectorAll('#edCols button').forEach(x => x.classList.toggle('on', x === b)); });
-  const ec = bar.querySelector('#edCh'), ew = bar.querySelector('#edWord'); if (ec) ec.oninput = () => editor.ch = ec.value.toUpperCase(); if (ew) ew.onchange = () => { editor.lv.word = ew.value.toUpperCase(); edRefresh(); };
+  const ec = bar.querySelector('#edCh'), ew = bar.querySelector('#edWord'); const eg = bar.querySelector('#edGen'), er = bar.querySelector('#edRod'); if (eg) eg.onclick = () => edAddLetters(ec.value); if (er) er.onchange = () => editor.rodLen = +er.value || 130; if (ew) ew.onchange = () => { editor.lv.word = ew.value.toUpperCase(); edRefresh(); };
   bar.querySelector('#edClear').onclick = () => { if (confirm('清空所有环？')) { editor.lv.rings = []; editor.lv.clips = []; edRefresh(); } };
   bar.querySelector('#edDone').onclick = () => closeEditor(true); bar.querySelector('#edCancel').onclick = () => closeEditor(false);
   edRefresh();
@@ -273,6 +302,7 @@ function levelCheck() { const lv = levelFromSettings(S), s = solveLevel(lv, S.gr
 function levelExport() { const lv = levelFromSettings(S); download(new Blob([JSON.stringify({ app: APP_ID, level: { name: lv.name, rings: lv.rings, clips: lv.clips, theme: lv.theme, word: lv.word } }, null, 1)], { type: 'application/json' }), 'ring-untangle-level.json'); }
 function levelImport() { const f = document.createElement('input'); f.type = 'file'; f.accept = '.json,application/json'; f.onchange = () => { const file = f.files[0]; if (!file) return; file.text().then(t => { const j = JSON.parse(t), lv = normalizeLevel(j.level || j); if (!lv.rings.length) throw new Error('没有有效的环'); S[levelKey(S)] = JSON.stringify({ name: lv.name || file.name, rings: lv.rings, clips: lv.clips, theme: lv.theme, word: lv.word }); saveSettings(S); buildPanel(); newGame(); toast(`已导入 ${lv.rings.length} 个环`); }).catch(e => toast('导入失败：' + e.message)); }; f.click(); }
 function doRandom() { const lv = randomLevel(S); S[levelKey(S)] = JSON.stringify({ name: lv.name, rings: lv.rings, clips: lv.clips, theme: lv.theme, word: lv.word }); saveSettings(S); buildPanel(); newGame(); toast(`随机关卡：${lv.rings.length} 个环、${lv.clips.length} 个扣（「画布与关卡」可恢复参考关卡）`, 2200); }
+function reseed() { S.wordSeed = ((S.wordSeed | 0) + 1) % 1000; S.levelJsonL = ''; saveSettings(S); buildPanel(); newGame(); toast(`已重新生成「${S.word}」布局（种子 ${S.wordSeed}）`); }
 function levelRef() { S[levelKey(S)] = ''; saveSettings(S); buildPanel(); newGame(); toast('已恢复参考关卡'); }
 
 // ---------- 录制（只由“⏺ 开始录制”或 autoRec 触发）----------
@@ -350,7 +380,7 @@ async function doExport3D() {
   const blob = makeZip(files), name = `ring-untangle-tool_3d_export_${stampNow()}.zip`; download(blob, name); window.__3dLast = { name, size: blob.size, tracks: tracks.length }; status(`3D 导出：${nodes.length} 个节点，${tracks.length} 条动画轨道`); return window.__3dLast;
 }
 async function doExportH5() { try { return await exportH5PlayableFromPage({ toolId: APP_ID, S, stripDataUrls: [DEFAULT_HAND], status, toast }); } catch (e) { status('H5 导出失败：' + e.message); console.error(e); return null; } }
-const PANEL_ACTIONS = { aeToggle: () => aeActive() ? aeStopAndExport() : recStart(), aeExport: () => doExportAE(), export3d: () => doExport3D(), exportH5: () => doExportH5(), levelEdit: openEditor, levelCheck, levelExport, levelImport, levelRef };
+const PANEL_ACTIONS = { reseed: () => reseed(), aeToggle: () => aeActive() ? aeStopAndExport() : recStart(), aeExport: () => doExportAE(), export3d: () => doExport3D(), exportH5: () => doExportH5(), levelEdit: openEditor, levelCheck, levelExport, levelImport, levelRef };
 
 // ---------- 主循环 ----------
 function frameTick(t) { step(t); updPress(); draw(); if (aeActive()) aeRec.sample(t); if (finishStopT != null && G.t >= finishStopT) { finishStopT = null; stopRec(); } }
@@ -364,7 +394,7 @@ function loop() {
 }
 
 // ---------- 设置面板 ----------
-const NEWGAME_KEYS = /^(canvas|levelJson|board|gripLimit|theme)/;
+const NEWGAME_KEYS = /^(canvas|levelJson|board|gripLimit|theme|word)/;
 function applyChange(k) {
   if (k === 'h5DeviceW' || k === 'h5DeviceH') markH5DeviceCustomIfSizeEdited(S);
   if (k === 'h5Device' || k === 'h5DeviceW' || k === 'h5DeviceH') { try { if (window.__h5EditorDeviceFit) window.__h5EditorDeviceFit(); } catch (e) { } }

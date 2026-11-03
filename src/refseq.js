@@ -25,3 +25,14 @@ export const LETTER_SEQ = [
 ];
 export const LETTER_END = 8.5;
 export const LETTER_HAND0 = { x: 560, y: 1120 };
+// CAKE 参考（letters_ref.mp4 12.0 s 为第 0 帧）：2.2 E 先滑出；2.8–4.3 顺时针转 C 让缺口对准上方 A 的套管 → 4.4 A；5.0–9.8 再转 C 到右侧 K → 10.3 K；10.8 C
+// 索引：0 C, 1 A, 2 K, 3 E
+export const CAKE_SEQ = [
+  { t: 1.7, i: 3, d: 0.25, ga: 90, dir: 1, sw: 6 },
+  { t: 2.8, i: 0, d: 1.5, ga: 90, dir: 1, sw: 112 },
+  { t: 4.4, i: 1, d: 0.25, ga: -90, dir: 1, sw: 6 },
+  { t: 5.0, i: 0, d: 4.5, ga: 90, dir: 1, sw: 78 },
+  { t: 10.3, i: 2, d: 0.25, ga: 0, dir: 1, sw: 6 },
+  { t: 10.8, i: 0, d: 0.2, ga: 90, dir: 1, sw: 4 },
+];
+export const LETTER_SEQS = { LUNCH: LETTER_SEQ, CAKE: CAKE_SEQ };

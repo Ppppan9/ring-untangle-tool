@@ -50,20 +50,24 @@ await q.mouse.move(rr[0], rr[1]); await q.mouse.down(); await q.mouse.move(rr[0]
 ok(await q.evaluate(s => window.__h5State() !== s, s0), 'H5：点击拖动改变游戏状态');
 await q.screenshot({ path: 'screenshots/h5_generic_390x844.png' });
 ok(errs2.length === 0, 'H5 无报错 ' + JSON.stringify(errs2));
-// 5) 字母型解锁主题
-await p.evaluate(() => { window.__vclock = window.__vclock || null; __game.setMany({ theme: 'letters', canvasW: 360, canvasH: 640, ssaa: 1 }); });
-ok(await p.evaluate(() => __game.L.theme === 'letters' && __game.L.rings.length === 5 && __game.solveLevel(__game.levelFromSettings(__game.S)).solvable), '字母主题：LUNCH 参考关卡 5 个字母，可解');
-await p.evaluate(() => { window.__T = 200000; __game.renderAt(window.__T); __game.startAuto(); });
-let lr = null; for (let s2 = 0; s2 < 30; s2++) { lr = await advance(p, 1); if (lr.win != null) break; }
-ok(lr.win != null && lr.left === 0, `字母主题：自动通关（参考序列，含转 C 脱扣），用时 ${lr.t.toFixed(1)} 秒`);
-ok(await p.evaluate(() => __game.G.rings.every(r => r.slot != null)), '字母主题：全部字母飞入单词槽');
-await p.evaluate(() => { __game.setMany({ autoMode: 'solver' }); __game.startAuto(); });
-lr = null; for (let s2 = 0; s2 < 40; s2++) { lr = await advance(p, 1); if (lr.win != null) break; }
-ok(lr.win != null, `字母主题：求解模式自动通关 ${lr.t.toFixed(1)} 秒`);
-await p.evaluate(() => { __game.setMany({ autoMode: 'ref', whiteModel: true }); __game.startAuto(); __game.aeStart(); }); await advance(p, 9); await p.evaluate(() => __game.aeStop());
-await grab(() => __game.doExportAE(), '字母主题 AE 导出（白模）');
-const h5L = await grab(() => __game.doExportH5(), '字母主题 H5 导出（白模）');
-await grab(() => __game.doExport3D(), '字母主题 3D 导出（白模）');
+// 5) 字母型解锁主题：LUNCH / CAKE 参考关 + 随机单词生成
+for (const [w, n] of [['LUNCH', 5], ['CAKE', 4]]) {
+  await p.evaluate(w => { __game.setMany({ theme: 'letters', word: w, wordSeed: 0, autoMode: 'ref', canvasW: 360, canvasH: 640, ssaa: 1 }); }, w);
+  ok(await p.evaluate(n => __game.L.theme === 'letters' && __game.L.rings.length === n && __game.solveLevel(__game.levelFromSettings(__game.S)).solvable, n), `字母主题：${w} 参考关卡 ${n} 个字母，可解`);
+  await p.evaluate(() => { window.__T = 200000; __game.renderAt(window.__T); __game.startAuto(); });
+  let lr = null; for (let s2 = 0; s2 < 30; s2++) { lr = await advance(p, 1); if (lr.win != null) break; }
+  ok(lr.win != null && lr.left === 0 && await p.evaluate(() => __game.G.rings.every(r => r.slot != null)), `字母主题 ${w}：参考序列自动通关（转 C 脱扣），用时 ${lr.t.toFixed(1)} 秒，全部入槽`);
+}
+ok(await p.evaluate(() => __game.L.clips.every(c => { const o = __game.L.rings[c.o]; return c.rx != null && Math.hypot(c.rx - o.x, c.ry - o.y) < 120; })), '字母主题：每根杆端都接在主人字母上（无悬空杆）');
+for (const w of ['MONEY', 'QUIZ', 'BRIGHTS', 'JAVELIN', 'SKY']) {
+  await p.evaluate(w => { __game.setMany({ word: w, wordSeed: 3, autoMode: 'solver' }); __game.startAuto(); }, w);
+  let lr = null; for (let s2 = 0; s2 < 60; s2++) { lr = await advance(p, 1); if (lr.win != null) break; }
+  ok(lr.win != null, `字母主题：随机单词 ${w}（${await p.evaluate(() => __game.L.clips.length)} 个扣）求解自动通关 ${lr.t.toFixed(1)} 秒`);
+}
+await p.evaluate(() => { __game.setMany({ word: 'CAKE', wordSeed: 0, autoMode: 'ref', whiteModel: true }); __game.startAuto(); __game.aeStart(); }); await advance(p, 12); await p.evaluate(() => __game.aeStop());
+await grab(() => __game.doExportAE(), '字母主题 CAKE AE 导出（白模）');
+await grab(() => __game.doExportH5(), '字母主题 CAKE H5 导出（白模）');
+await grab(() => __game.doExport3D(), '字母主题 CAKE 3D 导出（白模）');
 await p.evaluate(() => __game.setMany({ theme: 'rings', whiteModel: false }));
 ok(errs.length === 0, '全程无 console/page error ' + JSON.stringify(errs));
 await b.close();

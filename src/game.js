@@ -38,8 +38,48 @@ export const LETTER_LEVEL = {
     { c: 'yellow', ch: 'C', x: 224, y: 605, rot: 180, h: 140 }, { c: 'pink', ch: 'H', x: 424, y: 572, rot: 0, h: 142 },
     { c: 'teal', ch: 'U', x: 259, y: 838, rot: 0, h: 140 }, { c: 'orange', ch: 'L', x: 404, y: 828, rot: 0, h: 136 }, { c: 'purple', ch: 'N', x: 514, y: 840, rot: 0, h: 136 },
   ],
-  clips: [{ o: 1, g: 0, x: 284, y: 604, rx: 382, ry: 604 }, { o: 2, g: 0, x: 222, y: 664, rx: 222, ry: 770 }, { o: 3, g: 2, x: 292, y: 826, rx: 371, ry: 826 }, { o: 3, g: 4, x: 474, y: 860, rx: 444, ry: 860 }],
+  clips: [{ o: 1, g: 0, x: 284, y: 604, rx: 382, ry: 604 }, { o: 2, g: 0, x: 222, y: 664, rx: 222, ry: 770 }, { o: 3, g: 2, x: 292, y: 826, rx: 371, ry: 826 }, { o: 3, g: 4, x: 474, y: 860, rx: 371, ry: 860 }],
 };
+// 扣子吸附：珠吸到被扣字母笔画上，杆端吸到主人字母笔画上（避免"没接上"的悬空杆）
+export function snapLetterClips(L) {
+  for (const c of L.clips) { const o = L.rings[c.o], g = L.rings[c.g]; if (!o || !g || !o.ch || !g.ch) continue;
+    const qg = glyphNearest(glyphPolys(g.ch, g.h || 140, g.rot || 0), c.x - g.x, c.y - g.y); c.x = Math.round(g.x + qg.x); c.y = Math.round(g.y + qg.y);
+    const tx = c.rx ?? c.x, ty = c.ry ?? c.y, qo = glyphNearest(glyphPolys(o.ch, o.h || 140, o.rot || 0), tx - o.x, ty - o.y); c.rx = Math.round(o.x + qo.x); c.ry = Math.round(o.y + qo.y); }
+  return L;
+}
+// 解密单词 → 参考风格互锁布局：字母排成 1–2 行，相邻字母用 珠+杆 连接（随机生成树 + 额外边），
+// 方向随机；要求可解、开局被卡住的字母 ≥ 一半、含 C/G 时 C 必须被扣住（需要转动脱扣），否则换种子重试
+export function wordLevel(word, seed = 1, S = {}) {
+  const w = (String(word || 'CAKE').toUpperCase().replace(/[^A-Z]/g, '') || 'CAKE').slice(0, 8), n = w.length, H = 140;
+  const cols = n <= 4 ? n : Math.ceil(n / 2), rows = n <= 4 ? 1 : 2, sx = n <= 4 ? 150 : 150, sy = 210;
+  const pal = ['yellow', 'pink', 'teal', 'orange', 'purple', 'blue', 'green', 'red'];
+  for (let tr = 0; tr < 400; tr++) {
+    let r = (seed * 7919 + tr * 104729) % 2147483647 || 1; const rnd = () => (r = r * 16807 % 2147483647) / 2147483647;
+    const rings = [...w].map((ch, i) => { const row = rows === 1 ? 0 : (i < cols ? 0 : 1), col = rows === 1 ? i : (i < cols ? i : i - cols), nc = row === 0 ? cols : n - cols;
+      return { c: pal[(i + seed) % pal.length], ch, x: Math.round(360 - (nc - 1) * sx / 2 + col * sx + (rnd() - 0.5) * 20 + (row ? (rnd() - 0.5) * 40 : 0)), y: Math.round(640 + (row - (rows - 1) / 2) * sy + (rnd() - 0.5) * 30), rot: ch === 'C' || ch === 'G' ? 0 : 0, h: H }; });
+    // 候选边：距离近的字母对
+    const E = []; for (let a = 0; a < n; a++) for (let b = a + 1; b < n; b++) { const d = Math.hypot(rings[a].x - rings[b].x, rings[a].y - rings[b].y); if (d < 260) E.push([a, b, d + rnd() * 80]); }
+    E.sort((p, q) => p[2] - q[2]); const par = [...Array(n).keys()], f = x => par[x] === x ? x : (par[x] = f(par[x])), pick = [];
+    for (const e of E) { if (f(e[0]) !== f(e[1])) { par[f(e[0])] = f(e[1]); pick.push(e); } else if (rnd() < 0.25 && pick.length < n + 1) pick.push(e); }
+    if (pick.length < n - 1) continue;
+    const clips = pick.map(([a, b]) => { const [o, g] = rnd() < 0.5 ? [a, b] : [b, a], A = rings[o], B = rings[g], mx = (A.x + B.x) / 2 + (rnd() - 0.5) * 30, my = (A.y + B.y) / 2 + (rnd() - 0.5) * 40; return { o, g, x: mx, y: my, rx: mx, ry: my }; });
+    // C 必须被扣住；C 的缺口朝向背离所有珠
+    for (let i = 0; i < n; i++) if (rings[i].ch === 'C') { const cl = clips.filter(c => c.g === i), oc = clips.filter(c => c.o === i); oc.forEach(c => { const t = c.o; c.o = c.g; c.g = t; }); }
+    const L = snapLetterClips({ name: '解密单词 ' + w, theme: 'letters', word: w, rings, clips });
+    for (let i = 0; i < n; i++) if (rings[i].ch === 'C') { const cl = clips.filter(c => c.g === i); if (cl.length) { const ax = cl.reduce((s2, c) => s2 + c.x - rings[i].x, 0), ay = cl.reduce((s2, c) => s2 + c.y - rings[i].y, 0); rings[i].rot = Math.round((Math.atan2(ay, ax) * 180 / Math.PI + 180 + (rnd() - 0.5) * 60 + 360) % 360); snapLetterClips(L); } }
+    const NL = normalizeLevel(L), sv = solveLevel(NL), gone = NL.rings.map(() => false), blocked = NL.rings.filter((_, i) => !canFree(NL, gone, i)).length;
+    const hasC = rings.some(q => q.ch === 'C'), cOk = !hasC || rings.every((q, i) => q.ch !== 'C' || clips.some(c => c.g === i));
+    if (sv.solvable && blocked >= Math.floor(n / 2) && cOk) return NL;
+  }
+  return normalizeLevel(LETTER_LEVEL);
+}
+// CAKE 参考关（letters_ref.mp4 12–23 s Level 3；参考 x+64）：C 居中缺口朝左，A 上、K 右、E 下
+export const CAKE_LEVEL = {
+  name: '字母参考关卡 CAKE', theme: 'letters', word: 'CAKE',
+  rings: [{ c: 'orange', ch: 'C', x: 294, y: 682, rot: 180, h: 140 }, { c: 'teal', ch: 'A', x: 364, y: 520, rot: 0, h: 145 }, { c: 'purple', ch: 'K', x: 454, y: 712, rot: 0, h: 140 }, { c: 'yellow', ch: 'E', x: 300, y: 905, rot: 0, h: 140 }],
+  clips: [{ o: 1, g: 0, x: 314, y: 620, rx: 322, ry: 585 }, { o: 2, g: 0, x: 354, y: 685, rx: 418, ry: 685 }, { o: 0, g: 3, x: 270, y: 840, rx: 294, ry: 742 }],
+};
+export const WORD_REFS = { LUNCH: LETTER_LEVEL, CAKE: CAKE_LEVEL };
 export const isLetters = L => !!(L && L.theme === 'letters');
 export function normalizeLevel(j) {
   const L = { name: j.name || '自定义关卡', rings: [], clips: [], errors: [], theme: j.theme === 'letters' ? 'letters' : 'rings', word: j.word || '' };
@@ -51,7 +91,8 @@ export const levelKey = S => S.theme === 'letters' ? 'levelJsonL' : 'levelJson';
 export function levelFromSettings(S) {
   const j = S[levelKey(S)], lt = S.theme === 'letters';
   if (j && j.trim()) { try { const L = normalizeLevel({ ...JSON.parse(j), ...(lt ? { theme: 'letters' } : {}) }); if (L.rings.length) return L; } catch (e) { console.warn('关卡 JSON 无效，使用参考关卡', e); } }
-  return normalizeLevel(lt ? LETTER_LEVEL : REF_LEVEL);
+  if (lt) { const w = (S.word || 'CAKE').toUpperCase(); return WORD_REFS[w] && !S.wordSeed ? normalizeLevel(snapLetterClips(JSON.parse(JSON.stringify(WORD_REFS[w])))) : wordLevel(w, (S.wordSeed | 0) + 1, S); }
+  return normalizeLevel(REF_LEVEL);
 }
 // 可解性：反复取下“可取下”的环
 export function canFree(L, gone, i, gripLimit = 0) {
