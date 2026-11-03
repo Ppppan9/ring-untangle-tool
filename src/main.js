@@ -1,6 +1,6 @@
 // 解环核玩工具 —— 主程序：游戏循环 / 3D 渲染合成 / 输入（按住拖动环）/ 自动通关（参考序列 + 求解）/ 关卡编辑器 / 录制 / AE·3D·H5 导出 / 设置面板
 import { GROUPS, DEFS, loadSettings, saveSettings, migrate, exportJSON, APP_ID, APP_VERSION } from './settings.js';
-import { Game, slotP, wordLevel, layoutIssues, levelKey, LETTER_LEVEL, levelFromSettings, solveLevel, normalizeLevel, randomLevel, REF_LEVEL, COLORS, COLOR_ZH, circleX } from './game.js';
+import { Game, ROTG, slotP, wordLevel, layoutIssues, levelKey, LETTER_LEVEL, levelFromSettings, solveLevel, normalizeLevel, randomLevel, REF_LEVEL, COLORS, COLOR_ZH, circleX } from './game.js';
 import { Scene3D, colorOf } from './scene3d.js';
 import { glyphPolys, glyphPolysS, glyphNearest, segGlyphDist, LTUBE, LCONN } from './glyphs.js';
 import { Sfx } from './audio.js';
@@ -93,13 +93,14 @@ function directorStep(h) {
     if (auto.mode === 'ref') { const SEQ = LT() ? LETTER_SEQS[String(S.word).toUpperCase()] || [] : REF_SEQ; if (auto.idx < SEQ.length) { const q = SEQ[auto.idx++]; st = { ...q, at: q.t / sp, d: q.d / sp }; } else auto.mode = 'solver'; }
     if (auto.mode === 'solver') {
       if (G.rings.some(r => r.state === 'fly')) return;
-      const free = G.freeIds(); if (!free.length) { status('⚠ 没有可取下的环（关卡卡死）'); stopAuto(); return; }
+      let free = G.freeIds(); if (LT()) { const f2 = free.filter(i => ROTG(S, L.rings[i].ch) || !G.grips(i).length); if (f2.length) free = f2; } if (!free.length) { status('⚠ 没有可取下的环（关卡卡死）'); stopAuto(); return; }
       const i = free.slice().sort((a, b) => Math.hypot(L.rings[a].x - hand.x, L.rings[a].y - hand.y) - Math.hypot(L.rings[b].x - hand.x, L.rings[b].y - hand.y))[0];
       const gap = (rnd(S.delayMin, S.delayMax) + (rnd() < S.thinkChance ? rnd(0, S.thinkMax) : 0)) / 1000 / sp;
       const mv = rnd(S.moveMin, S.moveMax) / 1000 / sp;
-      if (LT()) { const b = L.rings[i]; st = { i, ga: b.ch === 'C' ? 90 : -60, dir: 1, sw: b.ch === 'C' && G.grips(i).length ? 300 : 20, at: Math.max(tau + mv, auto.lastEnd + gap + mv), d: (b.ch === 'C' && G.grips(i).length ? 2.4 : 0.35) / sp }; }
+      if (LT()) { const b = L.rings[i], rg = ROTG(S, b.ch), hg = G.grips(i).length; st = { i, ga: rg && /[CG]/.test(b.ch) ? 90 : -60, dir: 1, sw: rg ? (hg ? (/[CG]/.test(b.ch) ? 300 : 340) : 45) : 0, at: Math.max(tau + mv, auto.lastEnd + gap + mv), d: (rg && hg ? 2.4 : 0.5) / sp }; }
       else st = { i, ga: bestGrab(i), dir: rnd() < 0.5 ? 1 : -1, at: Math.max(tau + mv, auto.lastEnd + gap + mv), d: S.dragDur / 1000 / sp };
     }
+    if (LT() && st) { const b = L.rings[st.i]; if (!ROTG(S, b.ch)) { st.lin = true; st.d = Math.max(st.d, 0.45 / sp); } else if (!G.grips(st.i).length && Math.abs(st.sw || 0) < (S.exitDeg ?? 24) + 8) { st.sw = (S.exitDeg ?? 24) + 16; st.d = Math.max(st.d, 0.5 / sp); } }
     const [gx, gy] = LT() && auto.mode === 'ref' ? grabPoint(st.i, st.ga) : grabPoint(st.i, st.ga), j = auto.mode === 'solver' ? [(rnd() - 0.5) * S.jitter, (rnd() - 0.5) * S.jitter] : [0, 0];
     auto.plan = { ...st, from: [hand.x, hand.y], tgt: [gx + j[0], gy + j[1]], moveT0: Math.max(tau, st.at - Math.max(0.15 / sp, Math.min(st.at - tau, (S.moveMax / 1000) / sp * 1.4))), pressed: false, bend: [(rnd() - 0.5) * 60, 10 + rnd() * 30] };
   }
@@ -111,10 +112,12 @@ function directorStep(h) {
       if (G.rings[P.i].state !== 'idle') { auto.plan = null; return; }
       G.press(P.i, hand.x, hand.y); P.pressed = true; P.t1 = tau; hand.follow = 1; if (S.pressEnabled) hand.pressT0 = G.t;
       const r = G.rings[P.i]; P.piv = [r.px, r.py]; P.a0 = Math.atan2(hand.y - r.py, hand.x - r.px); P.rr = Math.hypot(hand.x - r.px, hand.y - r.py);
-      P.sweep = P.sw != null ? P.sw * Math.PI / 180 * P.dir : (G.drag.free ? S.dragMaxDeg : S.blockMaxDeg * 2.2) / Math.max(0.05, S.dragFollow) * Math.PI / 180 * P.dir;
+      if (LT() && P.lin) { const [ux, uy] = G.slideDir(P.i); P.lin = [ux, uy, (S.slideNeed ?? 40) + 35]; }
+      P.sweep = !LT() && G.drag.free && (S.pivotMode || 'center') === 'center' && !P.blocked ? G.ringNeed(P.i) * Math.PI / 180 * (G.grips(P.i).length ? 1 : P.dir) : P.sw != null ? P.sw * Math.PI / 180 * P.dir : (G.drag.free ? S.dragMaxDeg : S.blockMaxDeg * 2.2) / Math.max(0.05, S.dragFollow) * Math.PI / 180 * P.dir;
     }
     return;
   }
+  if (P.lin) { const u = clamp01((tau - P.t1) / P.d), e = easeIO(u); hand.x = P.tgt[0] + P.lin[0] * P.lin[2] * e; hand.y = P.tgt[1] + P.lin[1] * P.lin[2] * e; G.move(hand.x, hand.y); if (u >= 1) { G.release(); hand.follow = null; hand.pressT0 = null; auto.lastEnd = tau; auto.plan = null; } return; }
   const u = clamp01((tau - P.t1) / P.d), e = easeIO(u), wob = P.blocked ? Math.sin(u * Math.PI * 3) * 0.6 : 1, a = P.a0 + P.sweep * (P.blocked ? wob * 0.5 : e);
   hand.x = P.piv[0] + P.rr * Math.cos(a); hand.y = P.piv[1] + P.rr * Math.sin(a); G.move(hand.x, hand.y);
   if (u >= 1) { G.release(); hand.follow = null; hand.pressT0 = null; auto.lastEnd = tau; auto.plan = null; }
@@ -297,11 +300,12 @@ function buildEditBar() {
   let bar = document.getElementById('editBar'); if (bar) bar.remove(); bar = document.createElement('div'); bar.id = 'editBar';
   bar.innerHTML = `<b>✏ 关卡编辑</b> <span class="seg" id="edTools">${(L.theme === 'letters' ? ED_TOOLS_L : ED_TOOLS).map(([k, t]) => `<button data-t="${k}" class="${k === 'move' ? 'on' : ''}">${t}</button>`).join('')}</span>
   <span class="seg" id="edCols">${COLORS.map(c => `<button data-c="${c}" class="${c === 'red' ? 'on' : ''}" style="color:${S['col_' + c]}">●${COLOR_ZH[c]}</button>`).join('')}</span>
-  ${L.theme === 'letters' ? `生成字母<input id="edCh" maxlength="8" placeholder="输入字母" style="width:80px"><button id="edGen">＋生成</button> 杆长<input id="edRod" type="number" value="130" style="width:50px"> 单词<input id="edWord" value="${L.word || ''}" style="width:90px">` : ''}${L.theme === 'letters' ? `<span id="edStyles"> 字母风格<select id="edLS">${[['ref', '参考视频'], ['thick', '粗管'], ['candy', '糖果软胶']].map(([v, t]) => `<option value="${v}"${S.letterStyle === v ? ' selected' : ''}>${t}</option>`).join('')}</select> 连接件<select id="edCS">${[['beadRod', '珠杆'], ['collar', '金属套筒短杆'], ['clasp', '同色方扣细杆']].map(([v, t]) => `<option value="${v}"${S.connStyle === v ? ' selected' : ''}>${t}</option>`).join('')}</select> 材质<select id="edMT">${[['auto', '自动'], ['gloss', '光泽金属漆'], ['candy', '糖果软胶']].map(([v, t]) => `<option value="${v}"${S.materialTheme === v ? ' selected' : ''}>${t}</option>`).join('')}</select></span>` : ''}<button id="edClear">清空</button><button id="edDone" class="primary">✔ 完成并试玩</button><button id="edCancel">取消</button><div id="edInfo"></div>`;
+  ${L.theme === 'letters' ? `生成字母<input id="edCh" maxlength="8" placeholder="输入字母" style="width:80px"><button id="edGen">＋生成</button> 杆长<input id="edRod" type="number" value="130" style="width:50px"> 单词<input id="edWord" value="${L.word || ''}" style="width:90px">` : ''}${L.theme === 'letters' ? `<span id="edStyles"> 字母风格<select id="edLS">${[['ref', '参考视频'], ['thick', '粗管'], ['candy', '糖果软胶']].map(([v, t]) => `<option value="${v}"${S.letterStyle === v ? ' selected' : ''}>${t}</option>`).join('')}</select> 连接件<select id="edCS">${[['beadRod', '珠杆'], ['collar', '金属套筒短杆'], ['clasp', '同色方扣细杆']].map(([v, t]) => `<option value="${v}"${S.connStyle === v ? ' selected' : ''}>${t}</option>`).join('')}</select> 材质<select id="edMT">${[['auto', '自动'], ['gloss', '光泽金属漆'], ['candy', '糖果软胶']].map(([v, t]) => `<option value="${v}"${S.materialTheme === v ? ' selected' : ''}>${t}</option>`).join('')}</select> 旋转解锁字母<input id="edRG" value="${S.rotGlyphs ?? 'COGQ'}" title="这些字母只能旋转解锁，其余字母只能沿杆拖出" style="width:60px"></span>` : ''}<button id="edClear">清空</button><button id="edDone" class="primary">✔ 完成并试玩</button><button id="edCancel">取消</button><div id="edInfo"></div>`;
   document.getElementById('stageWrap').append(bar);
   bar.querySelectorAll('#edTools button').forEach(b => b.onclick = () => { editor.tool = b.dataset.t; editor.link = -1; bar.querySelectorAll('#edTools button').forEach(x => x.classList.toggle('on', x === b)); });
   bar.querySelectorAll('#edCols button').forEach(b => b.onclick = () => { editor.color = b.dataset.c; bar.querySelectorAll('#edCols button').forEach(x => x.classList.toggle('on', x === b)); });
   const ec = bar.querySelector('#edCh'), ew = bar.querySelector('#edWord'); const eg = bar.querySelector('#edGen'), er = bar.querySelector('#edRod'); if (eg) eg.onclick = () => edAddLetters(ec.value); if (er) er.onchange = () => editor.rodLen = +er.value || 130; if (ew) ew.onchange = () => { editor.lv.word = ew.value.toUpperCase(); edRefresh(); };
+  { const rg = bar.querySelector('#edRG'); if (rg) rg.onchange = () => { S.rotGlyphs = rg.value.toUpperCase().replace(/[^A-Z]/g, ''); rg.value = S.rotGlyphs; saveSettings(S); buildPanel(); edRefresh(); }; }
   [['#edLS', 'letterStyle'], ['#edCS', 'connStyle'], ['#edMT', 'materialTheme']].forEach(([id, k]) => { const el = bar.querySelector(id); if (el) el.onchange = () => { S[k] = el.value; saveSettings(S); buildPanel(); edRefresh(); }; });
   bar.querySelector('#edClear').onclick = () => { if (confirm('清空所有环？')) { editor.lv.rings = []; editor.lv.clips = []; edRefresh(); } };
   bar.querySelector('#edDone').onclick = () => closeEditor(true); bar.querySelector('#edCancel').onclick = () => closeEditor(false);
