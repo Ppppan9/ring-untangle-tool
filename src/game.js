@@ -101,8 +101,8 @@ export function normalizeLevel(j) {
 export const levelKey = S => S.theme === 'letters' ? 'levelJsonL' : 'levelJson';
 // 糖果风格 CAKE 参考关：按 style_candy.png 实测位置/尺寸（参考内容区 413×735 → 720×1280，×1.743）
 export const slotP = S => S.theme === 'letters' && S.letterStyle === 'candy' ? { w: S.candySlotW, h: S.candySlotH, gap: S.candySlotGap, y: S.candySlotY } : { w: S.slotW, h: S.slotH, gap: S.slotGap, y: S.slotY };
-export const CANDY_CAKE = { theme: 'letters', word: 'CAKE', rings: [{ c: 'orange', ch: 'C', x: 212, y: 763, rot: 180, h: 194, sx: 1.04 }, { c: 'teal', ch: 'A', x: 336, y: 520, rot: 0, h: 182, sx: 1.42 }, { c: 'purple', ch: 'K', x: 482, y: 776, rot: 0, h: 170, sx: 1.16 }, { c: 'yellow', ch: 'E', x: 222, y: 1040, rot: 0, h: 174, sx: 1.3 }],
-  clips: [{ o: 1, g: 0, x: 244, y: 669, rx: 271, ry: 606 }, { o: 2, g: 0, x: 307, y: 762, rx: 419, ry: 762 }, { o: 0, g: 3, x: 232, y: 968, rx: 232, ry: 864 }] };
+export const CANDY_CAKE = { theme: 'letters', word: 'CAKE', rings: [{ c: 'orange', ch: 'C', x: 212, y: 766, rot: 180, h: 220, sx: 0.86 }, { c: 'teal', ch: 'A', x: 346, y: 527, rot: 0, h: 196, sx: 1.28 }, { c: 'purple', ch: 'K', x: 482, y: 776, rot: 0, h: 170, sx: 1.24 }, { c: 'yellow', ch: 'E', x: 231, y: 1016, rot: 0, h: 174, sx: 1.22 }],
+  clips: [{ o: 1, g: 0, x: 244, y: 669, rx: 271, ry: 606 }, { o: 2, g: 0, x: 307, y: 762, rx: 419, ry: 762 }, { o: 0, g: 3, x: 238, y: 944, rx: 238, ry: 872 }] };
 export function levelFromSettings(S) {
   const j = S[levelKey(S)], lt = S.theme === 'letters';
   if (j && j.trim()) { try { const L = normalizeLevel({ ...JSON.parse(j), ...(lt ? { theme: 'letters' } : {}) }); if (L.rings.length) return L; } catch (e) { console.warn('关卡 JSON 无效，使用参考关卡', e); } }

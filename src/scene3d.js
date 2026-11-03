@@ -92,7 +92,7 @@ export class Scene3D {
   // 字母主题：每个字母 = 若干管状笔画（直线 / 圆弧，端点与拐角用球补圆）；扣子 = 米色珠（套在被扣字母笔画上）+ 黑色细杆（连到主人字母）
   buildLetters(L, S, mkMat, q, W, wc) {
     const mtk = matTheme(S), MT = MATERIAL_THEMES[mtk], CS = S.connStyle || 'beadRod', thick = CS === 'collar', clasp = CS === 'clasp';
-    const r = LTUBE(S), flat = S.letterStyle === 'candy' ? S.candyFlat : 1, cap = new THREE.SphereGeometry(r, Math.round(32 * q), Math.round(20 * q)); if (flat !== 1) cap.scale(1, 1, flat); const faceCap = new THREE.SphereGeometry(r * (S.candyFace || 0.7), Math.round(32 * q), Math.round(20 * q)); faceCap.scale(1, 1, flat * 0.9);
+    const r = LTUBE(S), flat = S.letterStyle === 'candy' ? S.candyFlat : 1, cap = new THREE.SphereGeometry(r, Math.round(32 * q), Math.round(20 * q)); if (flat !== 1) cap.scale(1, 1, flat); const faceCap = new THREE.SphereGeometry(r * (S.candyFace || 0.12), Math.round(32 * q), Math.round(20 * q)); faceCap.scale(1, 1, flat * 0.9);
     const sr = r * S.beadR, bead = new THREE.TorusGeometry((sr + r * 1.02) / 2, (sr - r * 1.02) / 2, Math.round(24 * q), Math.round(48 * q)), rod = new THREE.CylinderGeometry(S.rodR, S.rodR, 1, 20);
     bead.scale(1, 1, S.beadLen); bead.rotateX(Math.PI / 2); // 圆润甜甜圈珠：轴 = 局部 y
     const ball = new THREE.SphereGeometry(r * 0.75, 24, 16);
@@ -101,7 +101,7 @@ export class Scene3D {
       const P = glyphPolysS(b, b.rot || 0);
       for (const pl of P) {
         const pts = pl.map(([x, y]) => new THREE.Vector3(x, -y, 0)), curve = pts.length === 2 ? new THREE.LineCurve3(pts[0], pts[1]) : new THREE.CatmullRomCurve3(pts, false, 'centripetal');
-        const tgeo = new THREE.TubeGeometry(curve, pts.length === 2 ? 2 : Math.round(pts.length * 3 * q), r, Math.round(32 * q), false); if (flat !== 1) tgeo.scale(1, 1, flat); const m = new THREE.Mesh(tgeo, mat); m.castShadow = m.receiveShadow = true; g.add(m); if (face) { const fg = new THREE.TubeGeometry(curve, pts.length === 2 ? 2 : Math.round(pts.length * 3 * q), r * S.candyFace, Math.round(32 * q), false); fg.scale(1, 1, flat * 0.9); const fm = new THREE.Mesh(fg, face); fm.position.set(-S.candyFaceOff, S.candyFaceOff, r * flat * (1.07 - 0.9 * S.candyFace)); g.add(fm); for (const v of [pts[0], pts[pts.length - 1]]) { const c2 = new THREE.Mesh(faceCap, face); c2.position.copy(v).add(fm.position); g.add(c2); } } if (side) { const w = new THREE.Mesh(tgeo, side); w.position.set(S.candySide * 0.6, -S.candySide, -r * flat * 0.5); g.add(w); }
+        const tgeo = new THREE.TubeGeometry(curve, pts.length === 2 ? 2 : Math.round(pts.length * 3 * q), r, Math.round(32 * q), false); if (flat !== 1) tgeo.scale(1, 1, flat); const m = new THREE.Mesh(tgeo, mat); m.castShadow = m.receiveShadow = true; g.add(m); if (face) { const fg = new THREE.TubeGeometry(curve, pts.length === 2 ? 2 : Math.round(pts.length * 3 * q), r * S.candyFace, Math.round(32 * q), false); fg.scale(1, 1, flat * 0.9); const fm = new THREE.Mesh(fg, face); { const dd = Math.min(r * 0.9, S.candyFaceOff * Math.SQRT2); fm.position.set(-S.candyFaceOff, S.candyFaceOff, r * flat * (Math.sqrt(1 - (dd / r) ** 2) - 0.45 * S.candyFace)); } /* 参考：细亮线贴左上内沿，中心保持饱和 */ g.add(fm); for (const v of [pts[0], pts[pts.length - 1]]) { const c2 = new THREE.Mesh(faceCap, face); c2.position.copy(v).add(fm.position); g.add(c2); } } if (side) { const w = new THREE.Mesh(tgeo, side); w.position.set(S.candySide * 0.6, -S.candySide, -r * flat * 0.5); g.add(w); }
         for (const v of [pts[0], pts[pts.length - 1]]) { const c = new THREE.Mesh(cap, mat); c.position.copy(v); c.castShadow = true; g.add(c); if (side) { const w = new THREE.Mesh(cap, side); w.position.copy(v).add(new THREE.Vector3(S.candySide * 0.6, -S.candySide, -r * flat * 0.5)); g.add(w); } }
       }
       g.position.set(b.x, -b.y, 0); this.root.add(g); this.groups.push(g);
@@ -114,7 +114,7 @@ export class Scene3D {
       const tg = glyphNearest(glyphPolysS(gb, gb.rot || 0), c.x - gb.x, c.y - gb.y), qo = glyphNearest(glyphPolysS(o, o.rot || 0), (c.rx ?? c.x) - o.x, (c.ry ?? c.y) - o.y);
       if (clasp) { // 参考 style_candy：主人同色圆柱套箍（轴 = 被扣笔画切线，长≈笔画直径，外径≈1.15×）+ 同色细杆；套箍色按颜色单独微调（青/橙更深、紫更浅）
         const cm = go.userData.mats[0].clone(); if (!W) { const v = S['claspTone_' + o.c] ?? S.claspLight; if (v >= 0) cm.color.lerp(new THREE.Color('#ffffff'), v); else cm.color.multiplyScalar(1 + v); cm.emissive = cm.color.clone(); }
-        cm.clearcoat = 0.5; cm.clearcoatRoughness = 0.3; cm.roughness = 0.4; cm.userData.ei = cm.emissiveIntensity; go.userData.mats.push(cm); this.clipMeshes[k] = cm;
+        cm.clearcoat = 0.3; cm.clearcoatRoughness = 0.35; cm.roughness = 0.5; cm.transparent = false; cm.userData.ei = cm.emissiveIntensity; go.userData.mats.push(cm); this.clipMeshes[k] = cm;
         const rm2 = cm.clone(); if (!W) { rm2.color = go.userData.mats[0].color.clone(); rm2.emissive = rm2.color.clone(); } rm2.userData.ei = rm2.emissiveIntensity; go.userData.mats.push(rm2);
         const sr2 = r * S.claspR, sl2 = r * S.claspLen, band = sleeveGeom(sr2, sl2 / 2, Math.min(sr2, sl2 / 2) * 0.35, Math.round(40 * q)); band.scale(1, 1, flat > 0 && flat < 1 ? Math.max(flat * 1.25, 0.6) : 1);
         const rodT = new THREE.CylinderGeometry(r * S.claspRodR, r * S.claspRodR, 1, 20);
