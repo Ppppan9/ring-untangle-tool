@@ -49,3 +49,12 @@ export function glyphNearest(polys, x, y) {
   }
   return { d: bd, ang, x: px, y: py };
 }
+// 两个字形（各自偏移）之间的最近点对
+export function glyphClosest(PA, ax, ay, PB, bx, by) {
+  let best = { d: 1e9 };
+  for (const p of PA) for (let k = 0; k < p.length; k++) { const n = k + 1 < p.length ? 3 : 1; for (let s = 0; s < n; s++) { const t = s / n, x = ax + (k + 1 < p.length ? p[k][0] + (p[k + 1][0] - p[k][0]) * t : p[k][0]), y = ay + (k + 1 < p.length ? p[k][1] + (p[k + 1][1] - p[k][1]) * t : p[k][1]); const q = glyphNearest(PB, x - bx, y - by); if (q.d < best.d) best = { d: q.d, ax: x, ay: y, bx: bx + q.x, by: by + q.y, ang: q.ang }; } }
+  return best;
+}
+// 线段到字形（偏移）的最近距离
+export function segGlyphDist(x1, y1, x2, y2, P, ox, oy) { let d = 1e9; for (let k = 0; k <= 12; k++) { const t = k / 12; d = Math.min(d, glyphNearest(P, x1 + (x2 - x1) * t - ox, y1 + (y2 - y1) * t - oy).d); } return d; }
+export function segCross(a, b, c, d) { const o = (p, q, r) => Math.sign((q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])); return o(a, b, c) * o(a, b, d) < 0 && o(c, d, a) * o(c, d, b) < 0; }

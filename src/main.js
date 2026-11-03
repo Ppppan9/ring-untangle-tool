@@ -1,8 +1,8 @@
 // 解环核玩工具 —— 主程序：游戏循环 / 3D 渲染合成 / 输入（按住拖动环）/ 自动通关（参考序列 + 求解）/ 关卡编辑器 / 录制 / AE·3D·H5 导出 / 设置面板
 import { GROUPS, DEFS, loadSettings, saveSettings, migrate, exportJSON, APP_ID, APP_VERSION } from './settings.js';
-import { Game, levelKey, LETTER_LEVEL, levelFromSettings, solveLevel, normalizeLevel, randomLevel, REF_LEVEL, COLORS, COLOR_ZH, circleX } from './game.js';
+import { Game, layoutIssues, levelKey, LETTER_LEVEL, levelFromSettings, solveLevel, normalizeLevel, randomLevel, REF_LEVEL, COLORS, COLOR_ZH, circleX } from './game.js';
 import { Scene3D, colorOf } from './scene3d.js';
-import { glyphPolys, glyphNearest } from './glyphs.js';
+import { glyphPolys, glyphNearest, segGlyphDist } from './glyphs.js';
 import { Sfx } from './audio.js';
 import { REF_SEQ, REF_HAND0, LETTER_SEQS, LETTER_HAND0 } from './refseq.js';
 import { createAERecorder } from './ae/recorder.js';
@@ -243,9 +243,10 @@ function edAddLetters(txt) { const lv = editor.lv, w = String(txt || '').toUpper
 function edRodGhost(lx, ly, len) { const lv = editor.lv; let best = null; lv.rings.forEach((r, i) => { const q = glyphNearest(edPolys(r), lx - r.x, ly - r.y); if (q.d < 60 && (!best || q.d < best.d)) best = { i, q, d: q.d, r }; });
   if (!best) return { ok: false, x: lx, y: ly, bx: lx + len, by: ly };
   const { q, r } = best, ax = r.x + q.x, ay = r.y + q.y; let nx = -Math.sin(q.ang), ny = Math.cos(q.ang); if ((lx - ax) * nx + (ly - ay) * ny < 0) { nx = -nx; ny = -ny; } if (Math.hypot(lx - ax, ly - ay) < 4) { nx = Math.cos(q.ang + Math.PI / 2); ny = Math.sin(q.ang + Math.PI / 2); }
-  return { ok: true, o: best.i, x: ax, y: ay, bx: ax + nx * len, by: ay + ny * len, ang: Math.atan2(ny, nx) }; }
-function edThreadCheck(i) { // 字母 i 是否有笔画能穿过某个空套管：笔画到套管中心距离 < 套管半径，且笔画方向与杆方向夹角 > 35°（能从套管里穿过）
-  const lv = editor.lv, r = lv.rings[i], sr = S.letterTube * S.sleeveR; let best = null;
+  const bx = ax + nx * len, by = ay + ny * len, hit = lv.rings.some((q2, j) => j !== best.i && segGlyphDist(ax, ay, bx, by, edPolys(q2), q2.x, q2.y) < S.letterTube * 2 + 2 && glyphNearest(edPolys(q2), bx - q2.x, by - q2.y).d > S.letterTube * S.beadR * 1.6);
+  return { ok: !hit, hit, o: best.i, x: ax, y: ay, bx, by, ang: Math.atan2(ny, nx) }; }
+function edThreadCheck(i) { // 字母 i 是否有笔画能穿过某个空珠：笔画到套管中心距离 < 套管半径，且笔画方向与杆方向夹角 > 35°（能从套管里穿过）
+  const lv = editor.lv, r = lv.rings[i], sr = S.letterTube * S.beadR; let best = null;
   lv.clips.forEach((c, k) => { if (c.g >= 0 || c.o === i) return; const q = glyphNearest(edPolys(r), c.x - r.x, c.y - r.y); if (q.d > sr * 3.2) return; const rodA = Math.atan2(c.y - c.ry, c.x - c.rx); let da = Math.abs(((q.ang - rodA) * 180 / Math.PI % 180 + 180) % 180); da = Math.min(da, 180 - da);
     const ok = q.d < sr * 1.6 && da > 35; if (!best || q.d < best.q.d) best = { k, q, ok, dx: c.x - (r.x + q.x), dy: c.y - (r.y + q.y) }; });
   return best; }
@@ -270,16 +271,17 @@ function editorMove(x, y) {
   if (editor && editor.rod) { editor.rod.ghost = edRodGhost(IBX(x), IBY(y), editor.rod.len); return; }
   const D = editor && editor.drag; if (!D) return; const lv = editor.lv, lx = IBX(x), ly = IBY(y); if (D.k != null) { lv.clips[D.k].x = Math.round(lx + D.dx); lv.clips[D.k].y = Math.round(ly + D.dy); } else { const dx = lx - D.x0, dy = ly - D.y0; lv.rings[D.i].x = Math.round(D.r0.x + dx); lv.rings[D.i].y = Math.round(D.r0.y + dy); lv.clips.forEach((c, k) => { if (D.c0[k]) { c.x = Math.round(D.c0[k][0] + dx); c.y = Math.round(D.c0[k][1] + dy); if (D.c0[k][2] != null) { c.rx = Math.round(D.c0[k][2] + dx); c.ry = Math.round(D.c0[k][3] + dy); } } else if (lv.theme === 'letters' && c.g === D.i && Math.hypot(dx, dy) > 30) c.g = -1; }); if (lv.theme === 'letters') editor.thread = edThreadCheck(D.i); } level = normalizeLevel(lv); L = placeLevel(level); G = new Game(L, S); }
 function editorUp() {
-  if (editor && editor.rod) { const g = editor.rod.ghost; editor.rod = null; if (g.ok) { editor.lv.clips.push({ o: g.o, g: -1, rx: Math.round(g.x), ry: Math.round(g.y), x: Math.round(g.bx), y: Math.round(g.by) }); toast('杆端已固定在 ' + editor.lv.rings[g.o].ch + '，拖动另一个字母穿入套管'); } else toast('⚠ 请把杆拖到字母笔画上'); edRefresh(); return; }
+  if (editor && editor.rod) { const g = editor.rod.ghost; editor.rod = null; if (g.ok) { editor.lv.clips.push({ o: g.o, g: -1, rx: Math.round(g.x), ry: Math.round(g.y), x: Math.round(g.bx), y: Math.round(g.by) }); toast('杆端已固定在 ' + editor.lv.rings[g.o].ch + '，拖动另一个字母穿入珠子'); } else toast(g.hit ? '✖ 杆会穿过其他字母，换个位置/方向' : '⚠ 请把杆拖到字母笔画上'); edRefresh(); return; }
   if (editor && editor.drag) { const D = editor.drag; editor.drag = null; editor.thread = null;
-    if (editor.lv.theme === 'letters' && D.i != null) { const lv = editor.lv, t = edThreadCheck(D.i); if (t && t.ok) { lv.rings[D.i].x = Math.round(lv.rings[D.i].x + t.dx); lv.rings[D.i].y = Math.round(lv.rings[D.i].y + t.dy); lv.clips[t.k].g = D.i; toast(`✔ ${lv.rings[D.i].ch} 已穿入套管`); } else if (t) toast('✖ 该位置笔画无法穿过套管（方向/距离不合适）'); }
+    if (editor.lv.theme === 'letters' && D.i != null) { const lv = editor.lv, t = edThreadCheck(D.i); if (t && t.ok) { lv.rings[D.i].x = Math.round(lv.rings[D.i].x + t.dx); lv.rings[D.i].y = Math.round(lv.rings[D.i].y + t.dy); lv.clips[t.k].g = D.i; toast(`✔ ${lv.rings[D.i].ch} 已穿入套管`); } else if (t) toast('✖ 该位置笔画无法穿过珠子（方向/距离不合适）');
+      const ov = layoutIssues(normalizeLevel(lv), S.letterTube).list.filter(x => x[0] === 'overlap' && (x[1] === D.i || x[2] === D.i)); if (ov.length) { const dx = D.r0.x - lv.rings[D.i].x, dy = D.r0.y - lv.rings[D.i].y; lv.rings[D.i].x = D.r0.x; lv.rings[D.i].y = D.r0.y; lv.clips.forEach((c, k) => { if (D.c0[k]) { c.x += dx; c.y += dy; if (c.rx != null) { c.rx += dx; c.ry += dy; } } }); toast('✖ 字母重叠，已退回原位'); } }
     edRefresh(); } }
 function drawEditor(g) {
   g.lineWidth = 3;
-  if (editor.lv.theme === 'letters') { const sr = S.letterTube * S.sleeveR, P = (x, y) => [BX(x), BY(y)];
-    const rodDraw = (ax, ay, bx, by, col, a) => { g.save(); g.globalAlpha = a; g.strokeStyle = col; g.lineCap = 'round'; g.lineWidth = S.letterTube * 1.8 * bs(); g.beginPath(); g.moveTo(...P(ax, ay)); g.lineTo(...P(bx, by)); g.stroke(); g.fillStyle = col; g.beginPath(); g.arc(...P(bx, by), sr * bs(), 0, 7); g.fill(); g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = 2; g.beginPath(); g.arc(...P(bx, by), sr * 0.55 * bs(), 0, 7); g.stroke(); g.restore(); };
-    editor.lv.clips.forEach(c => { if (c.g < 0) rodDraw(c.rx, c.ry, c.x, c.y, S.col_gold || '#e6b24a', 0.95); });
-    if (editor.rod) { const q = editor.rod.ghost; rodDraw(q.x, q.y, q.bx, q.by, q.ok ? '#e6b24a' : '#ff3b3b', 0.4); }
+  if (editor.lv.theme === 'letters') { const sr = S.letterTube * S.beadR, P = (x, y) => [BX(x), BY(y)];
+    const rodDraw = (ax, ay, bx, by, col, a) => { g.save(); g.globalAlpha = a; g.strokeStyle = col === S.beadColor ? S.rodColor : col; g.lineCap = 'round'; g.lineWidth = S.rodR * 2.4 * bs(); g.beginPath(); g.moveTo(...P(ax, ay)); g.lineTo(...P(bx, by)); g.stroke(); g.fillStyle = col; g.beginPath(); g.arc(...P(bx, by), sr * bs(), 0, 7); g.fill(); g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = 2; g.beginPath(); g.arc(...P(bx, by), sr * 0.55 * bs(), 0, 7); g.stroke(); g.restore(); };
+    editor.lv.clips.forEach(c => { if (c.g < 0) rodDraw(c.rx, c.ry, c.x, c.y, S.beadColor, 0.95); });
+    if (editor.rod) { const q = editor.rod.ghost; rodDraw(q.x, q.y, q.bx, q.by, q.ok ? S.beadColor : '#ff3b3b', 0.4); }
     if (editor.thread) { const t = editor.thread, c = editor.lv.clips[t.k]; g.save(); g.strokeStyle = t.ok ? '#18c95a' : '#ff3b3b'; g.lineWidth = 5; g.setLineDash([8, 6]); g.beginPath(); g.arc(...P(c.x, c.y), sr * 1.9 * bs(), 0, 7); g.stroke(); g.restore(); }
     return; }
   L.clips.forEach(c => { const o = L.rings[c.o], gg = L.rings[c.g]; g.strokeStyle = 'rgba(0,0,0,0.35)'; g.setLineDash([6, 6]); g.beginPath(); g.moveTo(o.x, o.y); g.lineTo(c.x, c.y); g.lineTo(gg.x, gg.y); g.stroke(); g.setLineDash([]); });
