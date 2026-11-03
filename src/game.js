@@ -127,7 +127,7 @@ export class Game {
     const D = this.drag; if (!D) return null; this.drag = null; const r = this.rings[D.i];
     if (D.free && this.isFree(D.i)) {
       const b = this.L.rings[D.i], f = this.xf(D.i); let dx = f.x - r.px, dy = f.y - r.py;
-      if (Math.hypot(dx, dy) < 1) { const c = this.centroid(); dx = b.x - c[0]; dy = b.y - c[1]; }
+      { const c = this.centroid(); dx = b.x - c[0]; dy = b.y - c[1]; } // 参考：沿远离画面中心方向弹出
       const n = Math.hypot(dx, dy) || 1, sgn = r.rot >= 0 ? 1 : -1;
       r.state = 'fly'; r.fly = { t0: this.t, dur: this.S.flyDur / 1000, dx: dx / n, dy: dy / n, spin: this.S.flySpin * sgn };
       this.events.push({ type: 'pop', i: D.i }); return { ok: true, i: D.i };

@@ -9,6 +9,6 @@ execSync('ffmpeg -v error -y -ss 6 -i /workspace/ring-ref/ref.mp4 -frames:v 1 /t
 const C = { full: null, yellow: '520:520:60:800', center: '420:420:330:1000', clip: '200:200:440:860', interlock: '360:360:330:560', bottom: '520:420:60:1400' };
 for (const [k, c] of Object.entries(C)) {
   const f = c ? `crop=${c},scale=600:-1` : 'scale=540:960';
-  execSync(`ffmpeg -v error -y -i /tmp/ref6.png -i /tmp/tool6.png -filter_complex "[0]${f}[a];[1]${f}[b];[a][b]hstack" screenshots/side_v14_${k}${tag === 'x' ? '' : '_' + tag}.png && cp screenshots/side_v14_${k}${tag === 'x' ? '' : '_' + tag}.png /tmp/m_${k}_${Date.now()}.png`);
+  execSync(`ffmpeg -v error -y -i /tmp/ref6.png -i /tmp/tool6.png -filter_complex "[0]${f}[a];[1]${f}[b];[a][b]hstack" screenshots/side_v15_${k}${tag === 'x' ? '' : '_' + tag}.png && cp screenshots/side_v15_${k}${tag === 'x' ? '' : '_' + tag}.png /tmp/m_${k}_${Date.now()}.png`);
 }
 console.log('errors', errs); await b.close();
