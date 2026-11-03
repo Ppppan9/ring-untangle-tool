@@ -241,13 +241,15 @@ const edPolys = r => glyphPolys(r.ch, r.h || 140, r.rot || 0);
 function edAddLetters(txt) { const lv = editor.lv, w = String(txt || '').toUpperCase().replace(/[^A-Z]/g, ''); if (!w) return toast('请输入 A–Z 字母');
   [...w].forEach((ch, k) => lv.rings.push({ c: ['yellow', 'pink', 'teal', 'orange', 'purple', 'blue', 'green', 'red'][lv.rings.length % 8], ch, x: Math.round(360 - (w.length - 1) * 75 + k * 150), y: 640 + (lv.rings.length >= 4 ? 220 : 0), rot: 0, h: 140 }));
   lv.word = lv.word || lv.rings.map(r => r.ch).join(''); edRefresh(); toast(`已生成 ${w.length} 个字母`); }
+// 吸附/穿入容差：与连接件尺寸挂钩，但细小方扣也保证不小于 2.1×管径，所有风格组合手感一致
+const LSNAP = S => Math.max(LCONN(S), LTUBE(S) * 2.1);
 function edRodGhost(lx, ly, len) { const lv = editor.lv; let best = null; lv.rings.forEach((r, i) => { const q = glyphNearest(edPolys(r), lx - r.x, ly - r.y); if (q.d < 60 && (!best || q.d < best.d)) best = { i, q, d: q.d, r }; });
   if (!best) return { ok: false, x: lx, y: ly, bx: lx + len, by: ly };
   const { q, r } = best, ax = r.x + q.x, ay = r.y + q.y; let nx = -Math.sin(q.ang), ny = Math.cos(q.ang); if ((lx - ax) * nx + (ly - ay) * ny < 0) { nx = -nx; ny = -ny; } if (Math.hypot(lx - ax, ly - ay) < 4) { nx = Math.cos(q.ang + Math.PI / 2); ny = Math.sin(q.ang + Math.PI / 2); }
-  const bx = ax + nx * len, by = ay + ny * len, hit = lv.rings.some((q2, j) => j !== best.i && segGlyphDist(ax, ay, bx, by, edPolys(q2), q2.x, q2.y) < LTUBE(S) * 2 + 2 && glyphNearest(edPolys(q2), bx - q2.x, by - q2.y).d > LCONN(S) * 1.6);
+  const bx = ax + nx * len, by = ay + ny * len, hit = lv.rings.some((q2, j) => j !== best.i && segGlyphDist(ax, ay, bx, by, edPolys(q2), q2.x, q2.y) < LTUBE(S) * 2 + 2 && glyphNearest(edPolys(q2), bx - q2.x, by - q2.y).d > LSNAP(S) * 1.6);
   return { ok: !hit, hit, o: best.i, x: ax, y: ay, bx, by, ang: Math.atan2(ny, nx) }; }
 function edThreadCheck(i) { // 字母 i 是否有笔画能穿过某个空珠：笔画到套管中心距离 < 套管半径，且笔画方向与杆方向夹角 > 35°（能从套管里穿过）
-  const lv = editor.lv, r = lv.rings[i], sr = LCONN(S); let best = null;
+  const lv = editor.lv, r = lv.rings[i], sr = LSNAP(S); let best = null;
   lv.clips.forEach((c, k) => { if (c.g >= 0 || c.o === i) return; const q = glyphNearest(edPolys(r), c.x - r.x, c.y - r.y); if (q.d > sr * 3.2) return; const rodA = Math.atan2(c.y - c.ry, c.x - c.rx); let da = Math.abs(((q.ang - rodA) * 180 / Math.PI % 180 + 180) % 180); da = Math.min(da, 180 - da);
     const ok = q.d < sr * 1.6 && da > 35; if (!best || q.d < best.q.d) best = { k, q, ok, dx: c.x - (r.x + q.x), dy: c.y - (r.y + q.y) }; });
   return best; }
