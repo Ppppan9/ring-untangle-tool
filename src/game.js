@@ -78,7 +78,7 @@ export function wordLevel(word, seed = 1, S = {}) {
     for (let i = 0; i < n; i++) if (rings[i].ch === 'C') { const cl = clips.filter(c => c.g === i); if (cl.length) { const ax = cl.reduce((s2, c) => s2 + c.x - rings[i].x, 0), ay = cl.reduce((s2, c) => s2 + c.y - rings[i].y, 0); rings[i].rot = Math.round((Math.atan2(ay, ax) * 180 / Math.PI + 180 + (rnd() - 0.5) * 60 + 360) % 360); snapLetterClips(L); } }
     const NL = normalizeLevel(L), sv = solveLevel(NL), gone = NL.rings.map(() => false), blocked = NL.rings.filter((_, i) => !canFree(NL, gone, i)).length;
     const hasC = rings.some(q => q.ch === 'C'), cOk = !hasC || rings.every((q, i) => q.ch !== 'C' || clips.some(c => c.g === i));
-    if (sv.solvable && blocked >= Math.floor(n / 2) && cOk) { const is = layoutIssues(NL, S.letterModel ? LTUBE(S) : 9.5); if (is.total === 0) return NL; if (!bestL || is.total < bestL[0]) bestL = [is.total, NL]; }
+    if (sv.solvable && blocked >= Math.floor(n / 2) && cOk) { const is = layoutIssues(NL, LTUBE(S)); if (is.total === 0) return NL; if (!bestL || is.total < bestL[0]) bestL = [is.total, NL]; }
   }
   return bestL ? bestL[1] : normalizeLevel(LETTER_LEVEL);
 }
@@ -103,7 +103,7 @@ export function levelFromSettings(S) {
   const j = S[levelKey(S)], lt = S.theme === 'letters';
   if (j && j.trim()) { try { const L = normalizeLevel({ ...JSON.parse(j), ...(lt ? { theme: 'letters' } : {}) }); if (L.rings.length) return L; } catch (e) { console.warn('关卡 JSON 无效，使用参考关卡', e); } }
   if (lt) { const w = (S.word || 'CAKE').toUpperCase(), base = WORD_REFS[w] && !S.wordSeed ? JSON.parse(JSON.stringify(WORD_REFS[w])) : JSON.parse(JSON.stringify(wordLevel(w, (S.wordSeed | 0) + 1, S)));
-    if (S.letterModel === 'thickSleeve') spreadLevel(base, S.thickSpread || 1.3, S.thickScale || 1.2); return normalizeLevel(snapLetterClips(base)); }
+    if ((S.letterStyle || 'ref') !== 'ref') spreadLevel(base, S.thickSpread || 1.3, S.thickScale || 1.2); return normalizeLevel(snapLetterClips(base)); }
   return normalizeLevel(REF_LEVEL);
 }
 // 可解性：反复取下“可取下”的环

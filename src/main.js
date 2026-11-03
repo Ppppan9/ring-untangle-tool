@@ -127,14 +127,15 @@ function updAutoBtn() { const b = document.getElementById('btnAuto'); if (b) { b
 function xfs() { return G.rings.map((r, i) => r.state === 'gone' ? null : G.xf(i)); }
 function flashes() { return G.clipFlash.map(t0 => { const d = G.t - t0; return d >= 0 && d < 0.5 ? Math.max(0, Math.sin(d / 0.5 * Math.PI * 3)) * (1 - d / 0.5) : 0; }); }
 function drawBg(g) {
-  const gr = g.createLinearGradient(0, 0, 0, cv.height); gr.addColorStop(0, LT() ? S.lbgTop : S.bgTop); gr.addColorStop(1, LT() ? S.lbgBottom : S.bgBottom); g.fillStyle = gr; g.fillRect(0, 0, cv.width, cv.height);
+  const gr = g.createLinearGradient(0, 0, 0, cv.height); const CY = LT() && S.letterStyle === 'candy'; gr.addColorStop(0, CY ? S.candyBgTop : LT() ? S.lbgTop : S.bgTop); gr.addColorStop(1, CY ? S.candyBgBottom : LT() ? S.lbgBottom : S.bgBottom); g.fillStyle = gr; g.fillRect(0, 0, cv.width, cv.height);
   const rg = g.createRadialGradient(cv.width * 0.55, cv.height * 0.55, 10, cv.width * 0.55, cv.height * 0.55, cv.height * 0.6); rg.addColorStop(0, 'rgba(255,255,255,0.10)'); rg.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = rg; g.fillRect(0, 0, cv.width, cv.height);
 }
 function drawSlots(g) { // 字母主题：顶部单词槽（参考：浅色圆角底板 + 灰色圆角格，取下的字母飞入后显示为彩色字）
   if (!LT() || !L.word) return; g.setTransform(K, 0, 0, K, -view.x0 * K, -view.y0 * K);
   const n = L.word.length, w = S.slotW, gp = S.slotGap, x0 = 360 - (n * w + (n - 1) * gp) / 2, y = S.slotY, rr = (x, y, w, h, r) => { g.beginPath(); g.roundRect ? g.roundRect(x, y, w, h, r) : g.rect(x, y, w, h); };
-  g.fillStyle = 'rgba(235,240,250,0.75)'; g.strokeStyle = 'rgba(255,255,255,0.9)'; g.lineWidth = 3; rr(x0 - 12, y - 10, n * w + (n - 1) * gp + 24, S.slotH + 20, 14); g.fill(); g.stroke();
-  for (let k = 0; k < n; k++) { g.fillStyle = '#d6dbe4'; rr(x0 + k * (w + gp), y, w, S.slotH, 10); g.fill(); }
+  const CY = S.letterStyle === 'candy'; if (CY) { g.save(); g.shadowColor = 'rgba(120,90,50,0.18)'; g.shadowBlur = 10 * K; g.shadowOffsetY = 3 * K; g.fillStyle = '#ffffff'; rr(x0 - 16, y - 14, n * w + (n - 1) * gp + 32, S.slotH + 28, 18); g.fill(); g.restore(); }
+  else { g.fillStyle = 'rgba(235,240,250,0.75)'; g.strokeStyle = 'rgba(255,255,255,0.9)'; g.lineWidth = 3; rr(x0 - 12, y - 10, n * w + (n - 1) * gp + 24, S.slotH + 20, 14); g.fill(); g.stroke(); }
+  for (let k = 0; k < n; k++) { g.fillStyle = CY ? '#dfd6c8' :'#d6dbe4'; rr(x0 + k * (w + gp), y, w, S.slotH, 10); g.fill(); }
   g.font = `900 ${Math.round(S.slotH * 0.62)}px "Arial Rounded MT Bold","Arial Black",sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
   G.rings.forEach((r, i) => { if (r.state === 'gone' && r.slot != null) { g.fillStyle = S.whiteModel ? '#cfcfcf' : colorOf(S, L.rings[i].c); g.fillText(L.rings[i].ch, x0 + r.slot * (w + gp) + w / 2, y + S.slotH / 2 + 2); } });
   g.setTransform(1, 0, 0, 1, 0, 0);
@@ -291,11 +292,12 @@ function buildEditBar() {
   let bar = document.getElementById('editBar'); if (bar) bar.remove(); bar = document.createElement('div'); bar.id = 'editBar';
   bar.innerHTML = `<b>✏ 关卡编辑</b> <span class="seg" id="edTools">${(L.theme === 'letters' ? ED_TOOLS_L : ED_TOOLS).map(([k, t]) => `<button data-t="${k}" class="${k === 'move' ? 'on' : ''}">${t}</button>`).join('')}</span>
   <span class="seg" id="edCols">${COLORS.map(c => `<button data-c="${c}" class="${c === 'red' ? 'on' : ''}" style="color:${S['col_' + c]}">●${COLOR_ZH[c]}</button>`).join('')}</span>
-  ${L.theme === 'letters' ? `生成字母<input id="edCh" maxlength="8" placeholder="输入字母" style="width:80px"><button id="edGen">＋生成</button> 杆长<input id="edRod" type="number" value="130" style="width:50px"> 单词<input id="edWord" value="${L.word || ''}" style="width:90px">` : ''}<button id="edClear">清空</button><button id="edDone" class="primary">✔ 完成并试玩</button><button id="edCancel">取消</button><div id="edInfo"></div>`;
+  ${L.theme === 'letters' ? `生成字母<input id="edCh" maxlength="8" placeholder="输入字母" style="width:80px"><button id="edGen">＋生成</button> 杆长<input id="edRod" type="number" value="130" style="width:50px"> 单词<input id="edWord" value="${L.word || ''}" style="width:90px">` : ''}${L.theme === 'letters' ? `<span id="edStyles"> 字母风格<select id="edLS">${[['ref', '参考视频'], ['thick', '粗管'], ['candy', '糖果软胶']].map(([v, t]) => `<option value="${v}"${S.letterStyle === v ? ' selected' : ''}>${t}</option>`).join('')}</select> 连接件<select id="edCS">${[['beadRod', '珠杆'], ['collar', '金属套筒短杆'], ['clasp', '同色方扣细杆']].map(([v, t]) => `<option value="${v}"${S.connStyle === v ? ' selected' : ''}>${t}</option>`).join('')}</select> 材质<select id="edMT">${[['auto', '自动'], ['gloss', '光泽金属漆'], ['candy', '糖果软胶']].map(([v, t]) => `<option value="${v}"${S.materialTheme === v ? ' selected' : ''}>${t}</option>`).join('')}</select></span>` : ''}<button id="edClear">清空</button><button id="edDone" class="primary">✔ 完成并试玩</button><button id="edCancel">取消</button><div id="edInfo"></div>`;
   document.getElementById('stageWrap').append(bar);
   bar.querySelectorAll('#edTools button').forEach(b => b.onclick = () => { editor.tool = b.dataset.t; editor.link = -1; bar.querySelectorAll('#edTools button').forEach(x => x.classList.toggle('on', x === b)); });
   bar.querySelectorAll('#edCols button').forEach(b => b.onclick = () => { editor.color = b.dataset.c; bar.querySelectorAll('#edCols button').forEach(x => x.classList.toggle('on', x === b)); });
   const ec = bar.querySelector('#edCh'), ew = bar.querySelector('#edWord'); const eg = bar.querySelector('#edGen'), er = bar.querySelector('#edRod'); if (eg) eg.onclick = () => edAddLetters(ec.value); if (er) er.onchange = () => editor.rodLen = +er.value || 130; if (ew) ew.onchange = () => { editor.lv.word = ew.value.toUpperCase(); edRefresh(); };
+  [['#edLS', 'letterStyle'], ['#edCS', 'connStyle'], ['#edMT', 'materialTheme']].forEach(([id, k]) => { const el = bar.querySelector(id); if (el) el.onchange = () => { S[k] = el.value; saveSettings(S); buildPanel(); edRefresh(); }; });
   bar.querySelector('#edClear').onclick = () => { if (confirm('清空所有环？')) { editor.lv.rings = []; editor.lv.clips = []; edRefresh(); } };
   bar.querySelector('#edDone').onclick = () => closeEditor(true); bar.querySelector('#edCancel').onclick = () => closeEditor(false);
   edRefresh();
@@ -396,7 +398,7 @@ function loop() {
 }
 
 // ---------- 设置面板 ----------
-const NEWGAME_KEYS = /^(canvas|levelJson|board|gripLimit|theme|word|letterModel|thick)/;
+const NEWGAME_KEYS = /^(canvas|levelJson|board|gripLimit|theme|word|letterStyle|connStyle|thick|candyTube)/;
 function applyChange(k) {
   if (k === 'h5DeviceW' || k === 'h5DeviceH') markH5DeviceCustomIfSizeEdited(S);
   if (k === 'h5Device' || k === 'h5DeviceW' || k === 'h5DeviceH') { try { if (window.__h5EditorDeviceFit) window.__h5EditorDeviceFit(); } catch (e) { } }

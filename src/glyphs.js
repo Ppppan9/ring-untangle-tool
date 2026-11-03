@@ -58,8 +58,10 @@ export function glyphClosest(PA, ax, ay, PB, bx, by) {
 // 线段到字形（偏移）的最近距离
 export function segGlyphDist(x1, y1, x2, y2, P, ox, oy) { let d = 1e9; for (let k = 0; k <= 12; k++) { const t = k / 12; d = Math.min(d, glyphNearest(P, x1 + (x2 - x1) * t - ox, y1 + (y2 - y1) * t - oy).d); } return d; }
 export function segCross(a, b, c, d) { const o = (p, q, r) => Math.sign((q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])); return o(a, b, c) * o(a, b, d) < 0 && o(c, d, a) * o(c, d, b) < 0; }
-// 模型风格轴（字母几何 + 连接件样式）与材质轴分离：
-export const LETTER_MODELS = { beadRod: { zh: '参考视频珠杆', tube: S => S.letterTube, conn: S => S.letterTube * S.beadR }, thickSleeve: { zh: '粗管套筒', tube: S => S.thickTube, conn: S => S.thickTube * S.collarR } };
-export const LMODEL = S => LETTER_MODELS[S.letterModel] || LETTER_MODELS.beadRod;
-export const LTUBE = S => LMODEL(S).tube(S);
-export const LCONN = S => LMODEL(S).conn(S);
+// 三条独立轴：字母风格（几何/管径） × 连接件风格 × 材质主题
+export const LETTER_STYLES = { ref: { zh: '参考视频（细管）', tube: S => S.letterTube }, thick: { zh: '粗管', tube: S => S.thickTube }, candy: { zh: '糖果软胶（粗管亮色）', tube: S => S.candyTube } };
+export const CONN_STYLES = { beadRod: { zh: '珠杆（米色圆珠+深色细杆）', k: S => S.beadR }, collar: { zh: '金属套筒短杆', k: S => S.collarR }, clasp: { zh: '同色方扣细杆', k: S => S.claspR } };
+export const LSTYLE = S => LETTER_STYLES[S.letterStyle] ? S.letterStyle : 'ref';
+export const CSTYLE = S => CONN_STYLES[S.connStyle] ? S.connStyle : 'beadRod';
+export const LTUBE = S => LETTER_STYLES[LSTYLE(S)].tube(S);
+export const LCONN = S => LTUBE(S) * CONN_STYLES[CSTYLE(S)].k(S);

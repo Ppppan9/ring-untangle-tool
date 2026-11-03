@@ -2,15 +2,18 @@
 // 环 = 沿 C 形曲线的圆截面管（TubeGeometry，带半球圆头），在没有扣子的交叉处按上下层做真实 z 起伏（互相穿插）；
 // 扣子 = 圆角套管（LatheGeometry，圆角矩形截面绕轴旋转），套在“被扣住”的环管上，颜色 = 主人环颜色；离主人环较远的扣子用短柱连到主人环。
 // 材质 = MeshPhysicalMaterial（哑光塑料 + 轻清漆 + 绒光），RoomEnvironment PMREM 环境光 + 柔和主光，ACES / AgX 色调映射。
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { glyphPolys, glyphNearest, LTUBE } from './glyphs.js';
 // 材质主题轴（与模型风格独立）：目前只有当前光泽金属漆；以后新增材质在此表里加一项（覆盖 mkMat 参数）
-export const MATERIAL_THEMES = { gloss: { zh: '光泽金属漆（当前）', ring: {}, conn: {} } };
+export const MATERIAL_THEMES = { gloss: { zh: '光泽金属漆', ring: {}, conn: {} },
+  candy: { zh: '糖果软胶', ring: { metalness: 0, clearcoat: 1, clearcoatRoughness: 0.06, sheen: 0, iridescence: 0, specularIntensity: 0.55, envMapIntensity: 0.5 }, conn: {} } };
+export const matTheme = S => MATERIAL_THEMES[S.materialTheme] ? S.materialTheme : (S.letterStyle === 'candy' ? 'candy' : 'gloss');
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 const rad = d => d * Math.PI / 180;
-export function colorOf(S, c) { return /^#/.test(c) ? c : (S['col_' + c] || '#888888'); }
+export function colorOf(S, c) { return /^#/.test(c) ? c : (S.theme === 'letters' && S.letterStyle === 'candy' && S['candy_' + c]) || S['col_' + c] || '#888888'; }
 export function clipColor(S, c) { const col = new THREE.Color(colorOf(S, c)), hsl = {}; if (c === 'yellow' || c === 'orange') col.lerp(new THREE.Color(S.col_gold || '#b8903a'), S.clipGold); col.getHSL(hsl); const k = S.clipTint; col.setHSL((hsl.h + (c === 'green' || c === 'teal' ? 0.05 * k * 3 : 0)) % 1, Math.min(1, hsl.s * (1 - k * 0.3)), Math.min(0.85, hsl.l + k * 0.35)); return col; }
-const TONE = { aces: THREE.ACESFilmicToneMapping, agx: THREE.AgXToneMapping || THREE.ACESFilmicToneMapping, none: THREE.NoToneMapping };
+const TONE = { aces: THREE.ACESFilmicToneMapping, agx: THREE.AgXToneMapping || THREE.ACESFilmicToneMapping, none: THREE.NoToneMapping, neutral: THREE.LinearToneMapping };
 // 每个环上的交叉点：与别的环相交、且附近没有扣子 → 上/下层起伏
 function crossings(L, R, clipR) {
   const out = L.rings.map(() => []);
@@ -56,7 +59,7 @@ export class Scene3D {
     this.groups = []; this.key = '';
   }
   build(L, S) {
-    const key = JSON.stringify([L.rings, L.clips, L.theme, ['whiteModel', 'whiteColor', 'letterTube', 'letterModel', 'thickTube', 'collarR', 'collarLen', 'collarRodR', 'collarColor', 'collarRough', 'materialTheme', 'beadColor', 'beadTube', 'beadRough', 'rodColor', 'rodR', 'beadR', 'beadLen', 'hl_pink', 'hl_red', 'hl_orange', 'hl_yellow', 'hl_green', 'hl_teal', 'hl_blue', 'hl_purple', 'ringR', 'tubeR', 'gapDeg', 'clipSize', 'roughness', 'clearcoat', 'clearcoatRough', 'sheen', 'envInt', 'clipTint', 'sleeveR', 'sleeveLen', 'sleeveBevel', 'clipRough', 'clipMetal', 'clipClearcoat', 'clipClearcoatRough', 'clipEnvInt', 'metalness', 'specInt', 'specTint', 'iridescence', 'stemMin', 'clipGold', 'crossDepth', 'crossWidth', 'meshQuality', 'sss'].map(k => S[k]), ['red', 'pink', 'orange', 'yellow', 'green', 'teal', 'blue', 'purple'].map(k => S['col_' + k])]);
+    const key = JSON.stringify([L.rings, L.clips, L.theme, ['whiteModel', 'whiteColor', 'letterTube', 'letterStyle', 'connStyle', 'candyTube', 'candyRough', 'candyGlow', 'claspR', 'claspLen', 'claspRodR', 'candy_teal', 'candy_orange', 'candy_purple', 'candy_yellow', 'candy_red', 'candy_pink', 'candy_green', 'candy_blue', 'thickTube', 'collarR', 'collarLen', 'collarRodR', 'collarColor', 'collarRough', 'materialTheme', 'beadColor', 'beadTube', 'beadRough', 'rodColor', 'rodR', 'beadR', 'beadLen', 'hl_pink', 'hl_red', 'hl_orange', 'hl_yellow', 'hl_green', 'hl_teal', 'hl_blue', 'hl_purple', 'ringR', 'tubeR', 'gapDeg', 'clipSize', 'roughness', 'clearcoat', 'clearcoatRough', 'sheen', 'envInt', 'clipTint', 'sleeveR', 'sleeveLen', 'sleeveBevel', 'clipRough', 'clipMetal', 'clipClearcoat', 'clipClearcoatRough', 'clipEnvInt', 'metalness', 'specInt', 'specTint', 'iridescence', 'stemMin', 'clipGold', 'crossDepth', 'crossWidth', 'meshQuality', 'sss'].map(k => S[k]), ['red', 'pink', 'orange', 'yellow', 'green', 'teal', 'blue', 'purple'].map(k => S['col_' + k])]);
     if (key === this.key) return; this.key = key;
     for (const g of this.groups) { this.root.remove(g); g.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); }
     this.groups = []; this.clipMeshes = [];
@@ -88,13 +91,13 @@ export class Scene3D {
   }
   // 字母主题：每个字母 = 若干管状笔画（直线 / 圆弧，端点与拐角用球补圆）；扣子 = 米色珠（套在被扣字母笔画上）+ 黑色细杆（连到主人字母）
   buildLetters(L, S, mkMat, q, W, wc) {
-    const MT = MATERIAL_THEMES[S.materialTheme] || MATERIAL_THEMES.gloss, thick = S.letterModel === 'thickSleeve';
+    const mtk = matTheme(S), MT = MATERIAL_THEMES[mtk], CS = S.connStyle || 'beadRod', thick = CS === 'collar', clasp = CS === 'clasp';
     const r = LTUBE(S), cap = new THREE.SphereGeometry(r, Math.round(32 * q), Math.round(20 * q));
     const sr = r * S.beadR, bead = new THREE.TorusGeometry((sr + r * 1.02) / 2, (sr - r * 1.02) / 2, Math.round(24 * q), Math.round(48 * q)), rod = new THREE.CylinderGeometry(S.rodR, S.rodR, 1, 20);
     bead.scale(1, 1, S.beadLen); bead.rotateX(Math.PI / 2); // 圆润甜甜圈珠：轴 = 局部 y
     const ball = new THREE.SphereGeometry(r * 0.75, 24, 16);
     L.rings.forEach((b, i) => {
-      const g = new THREE.Group(); g.userData.i = i; const mat = mkMat(colorOf(S, b.c), false, S['hl_' + b.c] ?? 1); Object.assign(mat, MT.ring); g.userData.mats = [mat];
+      const g = new THREE.Group(); g.userData.i = i; const mat = mkMat(colorOf(S, b.c), false, S['hl_' + b.c] ?? 1); Object.assign(mat, MT.ring); if (mtk === 'candy') { mat.roughness = S.candyRough; mat.emissiveIntensity = W ? 0 : S.candyGlow; } g.userData.mats = [mat];
       const P = glyphPolys(b.ch, b.h || 140, b.rot || 0);
       for (const pl of P) {
         const pts = pl.map(([x, y]) => new THREE.Vector3(x, -y, 0)), curve = pts.length === 2 ? new THREE.LineCurve3(pts[0], pts[1]) : new THREE.CatmullRomCurve3(pts, false, 'centripetal');
@@ -109,6 +112,12 @@ export class Scene3D {
       const bm = new THREE.MeshPhysicalMaterial({ color: W ? wc : S.beadColor, roughness: S.beadRough, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.15, sheen: 0.4, sheenColor: new THREE.Color('#fff6dc'), envMapIntensity: 1.1, emissive: new THREE.Color(W ? wc : S.beadColor), emissiveIntensity: 0 }); go.userData.mats.push(bm); this.clipMeshes[k] = bm; // 参考：米色圆珠 + 深色细杆
       const rm = new THREE.MeshPhysicalMaterial({ color: W ? wc : S.rodColor, roughness: 0.3, metalness: 0.5, clearcoat: 0.6, envMapIntensity: 0.9 }); go.userData.mats.push(rm);
       const tg = glyphNearest(glyphPolys(gb.ch, gb.h || 140, gb.rot || 0), c.x - gb.x, c.y - gb.y), qo = glyphNearest(glyphPolys(o.ch, o.h || 140, o.rot || 0), (c.rx ?? c.x) - o.x, (c.ry ?? c.y) - o.y);
+      if (clasp) { // 同色方扣细杆：主人同色细杆从主人笔画伸出，末端圆角方扣包住被扣字母笔画
+        const cm = go.userData.mats[0].clone(); go.userData.mats.push(cm); this.clipMeshes[k] = cm;
+        const h = r * S.claspR, box = new RoundedBoxGeometry(h * 2, r * S.claspLen, h * 2, 4, Math.min(h, r * S.claspLen / 2) * 0.45), rodT = new THREE.CylinderGeometry(r * S.claspRodR, r * S.claspRodR, 1, 20);
+        const bx = c.x - o.x, by = -(c.y - o.y), ax = qo.x, ay = -qo.y, m = new THREE.Mesh(box, cm); m.position.set(bx, by, 0); m.rotation.z = -tg.ang - Math.PI / 2; m.castShadow = m.receiveShadow = true; go.add(m);
+        const dx = ax - bx, dy = ay - by, len = Math.hypot(dx, dy); if (len > 1) { const st = new THREE.Mesh(rodT, cm); st.scale.y = len; st.position.set((ax + bx) / 2, (ay + by) / 2, 0); st.rotation.z = Math.atan2(dy, dx) - Math.PI / 2; st.castShadow = true; go.add(st); }
+        return; }
       if (thick) { // 粗管套筒：拉丝金属圆柱套筒包住两端笔画（被扣字母 + 主人字母），中间短细金属杆
         const cm = new THREE.MeshPhysicalMaterial({ color: W ? wc : S.collarColor, metalness: 1, roughness: S.collarRough, clearcoat: 0.3, clearcoatRoughness: 0.4, envMapIntensity: 1.3, emissive: new THREE.Color(W ? wc : '#000000'), emissiveIntensity: 0, ...MT.conn }); go.userData.mats.push(cm); this.clipMeshes[k] = cm;
         const cr = r * S.collarR, cl = r * S.collarLen, col = sleeveGeom(cr, cl / 2, Math.min(cr, cl / 2) * 0.12, Math.round(40 * q)), rodT = new THREE.CylinderGeometry(r * S.collarRodR, r * S.collarRodR, 1, 24);
@@ -142,7 +151,7 @@ export class Scene3D {
   render(S, view, xfs, flash, only = -1) {
     this.makeEnv(S);
     const c = this.cam; c.left = view.x0; c.right = view.x0 + view.w; c.top = -view.y0; c.bottom = -(view.y0 + view.h); c.updateProjectionMatrix();
-    const R = this.renderer; R.toneMapping = TONE[S.toneMap] ?? THREE.ACESFilmicToneMapping; R.toneMappingExposure = S.exposure;
+    const R = this.renderer; R.toneMapping = (S.theme === 'letters' && matTheme(S) === 'candy' && !S.whiteModel) ? TONE.neutral : TONE[S.toneMap] ?? THREE.ACESFilmicToneMapping; // 糖果：中性色调映射，保留高饱和 R.toneMappingExposure = S.exposure;
     this.amb.intensity = S.ambInt; this.sun.intensity = S.lightInt; this.fill.intensity = S.fillInt;
     const la = rad(S.lightAz), le = rad(S.lightEl), cx = 360, cy = -760;
     this.sun.position.set(cx + 1500 * Math.cos(le) * Math.cos(la), cy + 1500 * Math.cos(le) * Math.sin(la), 1500 * Math.sin(le)); this.sun.target.position.set(cx, cy, 0);
