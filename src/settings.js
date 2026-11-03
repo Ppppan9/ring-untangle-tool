@@ -18,7 +18,7 @@ export const GROUPS = [
     ['candySide', '糖果：侧壁厚度(向右下挤出 px)', 'range', 4, 0, 20, 0.5], ['candySideDark', '糖果：侧壁暗度', 'range', 0.8, 0.2, 1, 0.01], ['claspTone_teal', '套箍色：青(负=加深)', 'range', -0.22, -0.8, 0.8, 0.01], ['claspTone_orange', '套箍色：橙', 'range', -0.15, -0.8, 0.8, 0.01], ['claspTone_purple', '套箍色：紫(参考为浅薰衣草)', 'range', 0.2, -0.8, 0.8, 0.01], ['claspTone_yellow', '套箍色：黄', 'range', -0.15, -0.8, 0.8, 0.01],
     ['claspLight', '方扣/细杆：相对主人颜色明暗(负 = 加深，参考≈-0.22)', 'range', -0.22, -0.8, 0.8, 0.01],
     ['candyScale', '糖果：生成关字高额外放大', 'range', 1.15, 0.8, 2, 0.01],
-    ['candyShA', '糖果：投影浓度', 'range', 0.42, 0, 1, 0.01], ['candyShBlur', '糖果：投影模糊(px)', 'range', 9, 0, 40, 0.5], ['candyShDX', '糖果：投影偏移X', 'range', 7, -40, 40, 0.5], ['candyShDY', '糖果：投影偏移Y', 'range', 10, -40, 40, 0.5], ['candyContact', '糖果：接触阴影', 'range', 0.35, 0, 1, 0.01],
+    ['candyShA', '糖果：投影浓度', 'range', 0.55, 0, 1, 0.01], ['candyShBlur', '糖果：投影模糊(px)', 'range', 6, 0, 40, 0.5], ['candyShDX', '糖果：投影偏移X', 'range', 7, -40, 40, 0.5], ['candyShDY', '糖果：投影偏移Y', 'range', 10, -40, 40, 0.5], ['candyContact', '糖果：接触阴影', 'range', 0.35, 0, 1, 0.01],
     ['candySlotW', '糖果：槽宽', 'range', 112, 20, 200, 1], ['candySlotH', '糖果：槽高', 'range', 134, 20, 220, 1], ['candySlotGap', '糖果：槽间距', 'range', 11, 0, 40, 1], ['candySlotY', '糖果：槽顶 Y', 'range', 116, 0, 600, 1],
     ['candyRough', '糖果：粗糙度', 'range', 0.45, 0, 1, 0.01],
     ['candyGlow', '糖果：通透自发光', 'range', 0.5, 0, 0.6, 0.01],
