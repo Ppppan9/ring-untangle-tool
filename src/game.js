@@ -1,4 +1,4 @@
-import { glyphPolys, glyphNearest, LETTERS, glyphClosest, segGlyphDist, segCross } from './glyphs.js';
+import { glyphPolys, glyphNearest, LETTERS, glyphClosest, segGlyphDist, segCross, LTUBE } from './glyphs.js';
 // 解环核玩工具 —— 关卡数据 / 规则 / 动画状态（与渲染无关，确定性）
 // 关卡：rings = [{c:颜色键, x, y, gap:缺口朝向(°，屏幕坐标 0=右 90=下)}]，clips = [{o:扣的主人(环索引), g:被扣住的环, x, y}]
 // 规则（来自参考视频：被取下的环留下的扣子仍挂在主人环上）：一个环自己身上没有仍扣着别的环的扣子 → 可以从别人的扣子里滑出取下；否则被卡住。
@@ -78,7 +78,7 @@ export function wordLevel(word, seed = 1, S = {}) {
     for (let i = 0; i < n; i++) if (rings[i].ch === 'C') { const cl = clips.filter(c => c.g === i); if (cl.length) { const ax = cl.reduce((s2, c) => s2 + c.x - rings[i].x, 0), ay = cl.reduce((s2, c) => s2 + c.y - rings[i].y, 0); rings[i].rot = Math.round((Math.atan2(ay, ax) * 180 / Math.PI + 180 + (rnd() - 0.5) * 60 + 360) % 360); snapLetterClips(L); } }
     const NL = normalizeLevel(L), sv = solveLevel(NL), gone = NL.rings.map(() => false), blocked = NL.rings.filter((_, i) => !canFree(NL, gone, i)).length;
     const hasC = rings.some(q => q.ch === 'C'), cOk = !hasC || rings.every((q, i) => q.ch !== 'C' || clips.some(c => c.g === i));
-    if (sv.solvable && blocked >= Math.floor(n / 2) && cOk) { const is = layoutIssues(NL, S.letterTube || 9.5); if (is.total === 0) return NL; if (!bestL || is.total < bestL[0]) bestL = [is.total, NL]; }
+    if (sv.solvable && blocked >= Math.floor(n / 2) && cOk) { const is = layoutIssues(NL, S.letterModel ? LTUBE(S) : 9.5); if (is.total === 0) return NL; if (!bestL || is.total < bestL[0]) bestL = [is.total, NL]; }
   }
   return bestL ? bestL[1] : normalizeLevel(LETTER_LEVEL);
 }
@@ -88,6 +88,8 @@ export const CAKE_LEVEL = {
   rings: [{ c: 'orange', ch: 'C', x: 294, y: 682, rot: 180, h: 140 }, { c: 'teal', ch: 'A', x: 364, y: 520, rot: 0, h: 145 }, { c: 'purple', ch: 'K', x: 454, y: 712, rot: 0, h: 140 }, { c: 'yellow', ch: 'E', x: 300, y: 905, rot: 0, h: 140 }],
   clips: [{ o: 1, g: 0, x: 314, y: 620, rx: 322, ry: 585 }, { o: 2, g: 0, x: 354, y: 685, rx: 418, ry: 685 }, { o: 0, g: 3, x: 294, y: 836, rx: 294, ry: 742 }],
 };
+// 粗管套筒模型：字母更粗更大 → 按比例拉开布局（以画面中心为基准）并放大字高
+export function spreadLevel(L, k, hk) { const cx = 360, cy = 700; L.rings.forEach(r => { r.x = Math.round(cx + (r.x - cx) * k); r.y = Math.round(cy + (r.y - cy) * k); r.h = Math.round((r.h || 140) * hk); }); L.clips.forEach(c => { c.x = cx + (c.x - cx) * k; c.y = cy + (c.y - cy) * k; if (c.rx != null) { c.rx = cx + (c.rx - cx) * k; c.ry = cy + (c.ry - cy) * k; } }); return L; }
 export const WORD_REFS = { LUNCH: LETTER_LEVEL, CAKE: CAKE_LEVEL };
 export const isLetters = L => !!(L && L.theme === 'letters');
 export function normalizeLevel(j) {
@@ -100,7 +102,8 @@ export const levelKey = S => S.theme === 'letters' ? 'levelJsonL' : 'levelJson';
 export function levelFromSettings(S) {
   const j = S[levelKey(S)], lt = S.theme === 'letters';
   if (j && j.trim()) { try { const L = normalizeLevel({ ...JSON.parse(j), ...(lt ? { theme: 'letters' } : {}) }); if (L.rings.length) return L; } catch (e) { console.warn('关卡 JSON 无效，使用参考关卡', e); } }
-  if (lt) { const w = (S.word || 'CAKE').toUpperCase(); return WORD_REFS[w] && !S.wordSeed ? normalizeLevel(snapLetterClips(JSON.parse(JSON.stringify(WORD_REFS[w])))) : wordLevel(w, (S.wordSeed | 0) + 1, S); }
+  if (lt) { const w = (S.word || 'CAKE').toUpperCase(), base = WORD_REFS[w] && !S.wordSeed ? JSON.parse(JSON.stringify(WORD_REFS[w])) : JSON.parse(JSON.stringify(wordLevel(w, (S.wordSeed | 0) + 1, S)));
+    if (S.letterModel === 'thickSleeve') spreadLevel(base, S.thickSpread || 1.3, S.thickScale || 1.2); return normalizeLevel(snapLetterClips(base)); }
   return normalizeLevel(REF_LEVEL);
 }
 // 可解性：反复取下“可取下”的环
@@ -179,7 +182,7 @@ export class Game {
   }
   hitTest(x, y, R, tube, pad) {
     let best = -1, bd = 1e9;
-    if (this.lt) { for (const r of this.rings) { if (r.state !== 'idle') continue; const b = this.L.rings[r.i], q = glyphNearest(this.polys(r.i), x - b.x, y - b.y); if (q.d < this.S.letterTube + pad + 10 && q.d < bd) { bd = q.d; best = r.i; } } return best; }
+    if (this.lt) { for (const r of this.rings) { if (r.state !== 'idle') continue; const b = this.L.rings[r.i], q = glyphNearest(this.polys(r.i), x - b.x, y - b.y); if (q.d < LTUBE(this.S) + pad + 10 && q.d < bd) { bd = q.d; best = r.i; } } return best; }
     for (const r of this.rings) { if (r.state !== 'idle') continue; const f = this.xf(r.i), d = Math.hypot(x - f.x, y - f.y), e = Math.abs(d - R); if (e < tube + pad && e < bd) { bd = e; best = r.i; } }
     if (best < 0) for (const r of this.rings) { if (r.state !== 'idle') continue; const f = this.xf(r.i), d = Math.hypot(x - f.x, y - f.y); if (d < R && d < bd) { bd = d; best = r.i; } }
     return best;

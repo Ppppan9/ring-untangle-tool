@@ -1,13 +1,23 @@
 // 解环核玩工具 —— 设置定义（中文标签），版本号 + 迁移。通用分组 / 键名按 game-toolkit-standard/TOOLKIT_STANDARD.md
 import { h5DeviceSelectOptions } from './h5/index.js';
-export const APP_VERSION = '1.9.0';
-export const SETTINGS_VERSION = 11;
+export const APP_VERSION = '1.10.0';
+export const SETTINGS_VERSION = 12;
 export const STORE_KEY = 'ringUntangleTool.settings';
 export const APP_ID = 'ring-untangle-tool';
 const ALL8 = 'applovin,facebook,google,mintegral,moloco,tiktok,unity,generic';
 // [key, 标签, 类型, 默认, min, max, step]
 export const GROUPS = [
   ['字母型解锁（参考 letters_ref.mp4）', [
+    ['letterModel', '模型风格（字母几何 + 连接件）', 'select', 'beadRod', [['beadRod', '参考视频珠杆（细管 + 米色圆珠 + 深色细杆）'], ['thickSleeve', '粗管套筒（粗圆管字母 + 拉丝金属套筒—短杆—套筒）']]],
+    ['materialTheme', '材质主题（与模型风格独立）', 'select', 'gloss', [['gloss', '光泽金属漆（当前）']]],
+    ['thickTube', '粗管套筒：字母管半径(px，参考图≈0.15×字高)', 'range', 20, 8, 40, 0.5],
+    ['thickSpread', '粗管套筒：布局拉开倍数', 'range', 1.3, 1, 2, 0.01],
+    ['thickScale', '粗管套筒：字高放大倍数', 'range', 1.2, 0.8, 2, 0.01],
+    ['collarR', '粗管套筒：套筒外半径(×管半径)', 'range', 1.28, 1.02, 2, 0.01],
+    ['collarLen', '粗管套筒：套筒长度(×管半径)', 'range', 1.9, 0.5, 4, 0.05],
+    ['collarRodR', '粗管套筒：短杆半径(×管半径)', 'range', 0.3, 0.1, 0.8, 0.01],
+    ['collarColor', '粗管套筒：套筒颜色(拉丝钢)', 'color', '#b9b6ae'],
+    ['collarRough', '粗管套筒：套筒粗糙度(拉丝)', 'range', 0.38, 0, 1, 0.01],
     ['word', '解密单词（A–Z，3–8 个字母；LUNCH+种子0 = 参考关卡）', 'text', 'CAKE'],
     ['wordSeed', '布局种子', 'range', 0, 0, 999, 1],
     ['_reseed', '换一种互锁布局', 'button', 'reseed', '🎲 重新生成布局'],
@@ -239,7 +249,7 @@ export const GROUPS = [
 export const DEFS = {};
 for (const [, items] of GROUPS) for (const it of items) if (it[2] !== 'button') DEFS[it[0]] = it[3];
 // v2（材质/建模复刻）：仍等于 v1 默认值的项换成新默认
-export const OLD_DEFAULTS = { 11: { beadR: 1.9, beadLen: 1.45, beadColor: '#eadcb6', rodR: 2.4 }, 10: {}, 9: {}, 8: { col_red: '#e0343f', col_purple: '#8c2c98', col_green: '#529a28', col_teal: '#1c7c48', col_yellow: '#d88a1e', col_gold: '#b08a3c', clipMetal: 0.55, clipGold: 0.7, col_blue: '#2f52b0', col_pink: '#c8363c' }, 7: { flyDur: 420, flyDist: 110, flyLift: 40, flyScale: 1.12, flySpin: 35, ambInt: 0.45, fillInt: 0.4, envInt: 1.25, exposure: 1.12, envDark: '#8a847c', col_orange: '#ea6d27', col_pink: '#d6464e', col_green: '#62aa36', col_teal: '#24905a', col_purple: '#9a33aa', col_blue: '#3159bd', envBoxH: 5.5, clearcoatRough: 0.22, envWarm: '#b4732e', col_yellow: '#d8891a', clipRough: 0.18, clipMetal: 0.6, clipGold: 0.45, col_gold: '#b8903a', clipClearcoatRough: 0.04, sleeveR: 1.62, sleeveLen: 2.9, depthBlur: 1.2, grain: 0.05, specInt: 1.0 }, 6: { roughness: 0.3, clearcoatRough: 0.12, col_yellow: '#dc901c', envWarm: '#c08a50' }, 5: { metalness: 0.6, roughness: 0.26, clearcoatRough: 0.08, clipMetal: 0.8, clipRough: 0.16, envBoxes: 1, envDark: '#77716a' }, 4: { metalness: 0, roughness: 0.4, clearcoat: 0.2, clearcoatRough: 0.65, sheen: 0.15, envInt: 0.6, specTint: 0.25, exposure: 0.8, clipMetal: 0.45, clipRough: 0.24, clipClearcoat: 0.8, clipClearcoatRough: 0.18, clipEnvInt: 1.3, lightInt: 3.8, ambInt: 0.35, fillInt: 0.35, sss: 0.0 }, 3: { sleeveR: 1.42, sleeveLen: 2.5, sleeveBevel: 0.2, roughness: 0.5, clearcoat: 0.25, clearcoatRough: 0.5, sheen: 0.35, envInt: 0.5, shadowAlpha: 0.3, shadowBlur: 14, shadowDX: 4, shadowDY: 16, col_red: '#d8303a', col_orange: '#e86a25', col_yellow: '#e9a72f-old', col_green: '#4f9f2a', col_teal: '#22894a', col_blue: '#2f55b8', col_purple: '#9530a8' }, 2: { ringR: 90, tubeR: 14, gapDeg: 52, roughness: 0.38, lightInt: 2.4, ambInt: 1.25, clipTint: 0.08, col_red: '#d9484b', col_orange: '#e8782f', col_yellow: '#e9b23c', col_green: '#3fa83f', col_teal: '#2b8f52', col_blue: '#3a5fc6', col_purple: '#9b3fb8', shadowAlpha: 0.22, shadowBlur: 10, shadowDX: 6, shadowDY: 12, bgTop: '#c4c3c4' } };
+export const OLD_DEFAULTS = { 12: {}, 11: { beadR: 1.9, beadLen: 1.45, beadColor: '#eadcb6', rodR: 2.4 }, 10: {}, 9: {}, 8: { col_red: '#e0343f', col_purple: '#8c2c98', col_green: '#529a28', col_teal: '#1c7c48', col_yellow: '#d88a1e', col_gold: '#b08a3c', clipMetal: 0.55, clipGold: 0.7, col_blue: '#2f52b0', col_pink: '#c8363c' }, 7: { flyDur: 420, flyDist: 110, flyLift: 40, flyScale: 1.12, flySpin: 35, ambInt: 0.45, fillInt: 0.4, envInt: 1.25, exposure: 1.12, envDark: '#8a847c', col_orange: '#ea6d27', col_pink: '#d6464e', col_green: '#62aa36', col_teal: '#24905a', col_purple: '#9a33aa', col_blue: '#3159bd', envBoxH: 5.5, clearcoatRough: 0.22, envWarm: '#b4732e', col_yellow: '#d8891a', clipRough: 0.18, clipMetal: 0.6, clipGold: 0.45, col_gold: '#b8903a', clipClearcoatRough: 0.04, sleeveR: 1.62, sleeveLen: 2.9, depthBlur: 1.2, grain: 0.05, specInt: 1.0 }, 6: { roughness: 0.3, clearcoatRough: 0.12, col_yellow: '#dc901c', envWarm: '#c08a50' }, 5: { metalness: 0.6, roughness: 0.26, clearcoatRough: 0.08, clipMetal: 0.8, clipRough: 0.16, envBoxes: 1, envDark: '#77716a' }, 4: { metalness: 0, roughness: 0.4, clearcoat: 0.2, clearcoatRough: 0.65, sheen: 0.15, envInt: 0.6, specTint: 0.25, exposure: 0.8, clipMetal: 0.45, clipRough: 0.24, clipClearcoat: 0.8, clipClearcoatRough: 0.18, clipEnvInt: 1.3, lightInt: 3.8, ambInt: 0.35, fillInt: 0.35, sss: 0.0 }, 3: { sleeveR: 1.42, sleeveLen: 2.5, sleeveBevel: 0.2, roughness: 0.5, clearcoat: 0.25, clearcoatRough: 0.5, sheen: 0.35, envInt: 0.5, shadowAlpha: 0.3, shadowBlur: 14, shadowDX: 4, shadowDY: 16, col_red: '#d8303a', col_orange: '#e86a25', col_yellow: '#e9a72f-old', col_green: '#4f9f2a', col_teal: '#22894a', col_blue: '#2f55b8', col_purple: '#9530a8' }, 2: { ringR: 90, tubeR: 14, gapDeg: 52, roughness: 0.38, lightInt: 2.4, ambInt: 1.25, clipTint: 0.08, col_red: '#d9484b', col_orange: '#e8782f', col_yellow: '#e9b23c', col_green: '#3fa83f', col_teal: '#2b8f52', col_blue: '#3a5fc6', col_purple: '#9b3fb8', shadowAlpha: 0.22, shadowBlur: 10, shadowDX: 6, shadowDY: 12, bgTop: '#c4c3c4' } };
 export function migrate(obj) {
   if (!obj || typeof obj !== 'object') return { ...DEFS };
   let v = obj.version || 0; const s = { ...(obj.settings || obj) };
