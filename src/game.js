@@ -220,7 +220,7 @@ export class Game {
   }
   release() {
     const D = this.drag; if (!D) return null; this.drag = null; const r = this.rings[D.i];
-    if (this.lt) { const b = this.L.rings[D.i], spin = ROTG(this.S, b.ch), free = this.isFree(D.i) && !this.grips(D.i).length;
+    if (this.lt) { const b = this.L.rings[D.i], spin = ROTG(this.S, b.ch), free = this.isFree(D.i) && (!spin || !this.grips(D.i).length); // 直线字母可从杆端滑下
       const okMove = spin ? Math.abs(D.cum) * 180 / Math.PI >= (this.S.exitDeg ?? 24) : (D.slide || 0) >= (this.S.slideNeed ?? 40); // 规则：旋转字母只能转出，直线字母只能沿杆拖出；不允许单击取下
       if (!(free && okMove)) { r.off = null; if (D.rel) return { ok: true, i: D.i, rel: true }; if (spin && this.isFree(D.i) && D.cum) return { ok: true, i: D.i, rel: false }; r.rot = D.base; r.shake = { t0: this.t, dur: this.S.shakeDur / 1000 }; this.events.push({ type: 'block', i: D.i }); return { ok: false, i: D.i, need: spin ? 'rotate' : 'slide' }; } r.off = null; }
     if (this.lt && this.isFree(D.i)) { r.slot = this.slotOf(D.i); r.state = 'fly'; r.fly = { t0: this.t, dur: this.S.letterFlyDur / 1000, slot: r.slot, sd: this.slideDir(D.i) }; this.events.push({ type: 'pop', i: D.i }); return { ok: true, i: D.i }; }

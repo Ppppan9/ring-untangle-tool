@@ -93,7 +93,7 @@ function directorStep(h) {
     if (auto.mode === 'ref') { const SEQ = LT() ? LETTER_SEQS[String(S.word).toUpperCase()] || [] : REF_SEQ; if (auto.idx < SEQ.length) { const q = SEQ[auto.idx++]; st = { ...q, at: q.t / sp, d: q.d / sp }; } else auto.mode = 'solver'; }
     if (auto.mode === 'solver') {
       if (G.rings.some(r => r.state === 'fly')) return;
-      let free = G.freeIds(); if (LT()) { const f2 = free.filter(i => ROTG(S, L.rings[i].ch) || !G.grips(i).length); if (f2.length) free = f2; } if (!free.length) { status('⚠ 没有可取下的环（关卡卡死）'); stopAuto(); return; }
+      let free = G.freeIds(); if (LT()) { const f2 = free; if (f2.length) free = f2; } if (!free.length) { status('⚠ 没有可取下的环（关卡卡死）'); stopAuto(); return; }
       const i = free.slice().sort((a, b) => Math.hypot(L.rings[a].x - hand.x, L.rings[a].y - hand.y) - Math.hypot(L.rings[b].x - hand.x, L.rings[b].y - hand.y))[0];
       const gap = (rnd(S.delayMin, S.delayMax) + (rnd() < S.thinkChance ? rnd(0, S.thinkMax) : 0)) / 1000 / sp;
       const mv = rnd(S.moveMin, S.moveMax) / 1000 / sp;
