@@ -1,4 +1,4 @@
-import { glyphPolys, glyphNearest, LETTERS, glyphClosest, segGlyphDist, segCross, LTUBE } from './glyphs.js';
+import { glyphPolys, glyphPolysS, glyphNearest, LETTERS, glyphClosest, segGlyphDist, segCross, LTUBE } from './glyphs.js';
 // 解环核玩工具 —— 关卡数据 / 规则 / 动画状态（与渲染无关，确定性）
 // 关卡：rings = [{c:颜色键, x, y, gap:缺口朝向(°，屏幕坐标 0=右 90=下)}]，clips = [{o:扣的主人(环索引), g:被扣住的环, x, y}]
 // 规则（来自参考视频：被取下的环留下的扣子仍挂在主人环上）：一个环自己身上没有仍扣着别的环的扣子 → 可以从别人的扣子里滑出取下；否则被卡住。
@@ -43,13 +43,13 @@ export const LETTER_LEVEL = {
 // 扣子吸附：珠吸到被扣字母笔画上，杆端吸到主人字母笔画上（避免"没接上"的悬空杆）
 export function snapLetterClips(L) {
   for (const c of L.clips) { const o = L.rings[c.o], g = L.rings[c.g]; if (!o || !g || !o.ch || !g.ch) continue;
-    const qg = glyphNearest(glyphPolys(g.ch, g.h || 140, g.rot || 0), c.x - g.x, c.y - g.y); c.x = Math.round(g.x + qg.x); c.y = Math.round(g.y + qg.y);
-    const tx = c.rx ?? c.x, ty = c.ry ?? c.y, qo = glyphNearest(glyphPolys(o.ch, o.h || 140, o.rot || 0), tx - o.x, ty - o.y); c.rx = Math.round(o.x + qo.x); c.ry = Math.round(o.y + qo.y); }
+    const qg = glyphNearest(glyphPolysS(g, g.rot || 0), c.x - g.x, c.y - g.y); c.x = Math.round(g.x + qg.x); c.y = Math.round(g.y + qg.y);
+    const tx = c.rx ?? c.x, ty = c.ry ?? c.y, qo = glyphNearest(glyphPolysS(o, o.rot || 0), tx - o.x, ty - o.y); c.rx = Math.round(o.x + qo.x); c.ry = Math.round(o.y + qo.y); }
   return L;
 }
 // 布局质量：字母间重叠、杆穿过其他字母、杆与杆交叉 → 罚分（0 = 整洁）
 export function layoutIssues(L, tube = 9.5) {
-  const P = L.rings.map(r => glyphPolys(r.ch, r.h || 140, r.rot || 0)), out = { overlap: 0, rodHit: 0, cross: 0, list: [] };
+  const P = L.rings.map(r => glyphPolysS(r, r.rot || 0)), out = { overlap: 0, rodHit: 0, cross: 0, list: [] };
   for (let a = 0; a < L.rings.length; a++) for (let b = a + 1; b < L.rings.length; b++) { const A = L.rings[a], B = L.rings[b]; if (Math.hypot(A.x - B.x, A.y - B.y) > 320) continue; const q = glyphClosest(P[a], A.x, A.y, P[b], B.x, B.y); if (q.d < tube * 2 + 8) { out.overlap++; out.list.push(['overlap', a, b]); } }
   L.clips.forEach((c, k) => { if (c.rx == null) return; L.rings.forEach((r, i) => { if (i === c.o || i === c.g) return; if (segGlyphDist(c.rx, c.ry, c.x, c.y, P[i], r.x, r.y) < tube * 2 + 4) { out.rodHit++; out.list.push(['rodHit', k, i]); } });
     L.clips.forEach((d, j) => { if (j <= k || d.rx == null) return; if (segCross([c.rx, c.ry], [c.x, c.y], [d.rx, d.ry], [d.x, d.y])) { out.cross++; out.list.push(['cross', k, j]); } }); });
@@ -94,16 +94,20 @@ export const WORD_REFS = { LUNCH: LETTER_LEVEL, CAKE: CAKE_LEVEL };
 export const isLetters = L => !!(L && L.theme === 'letters');
 export function normalizeLevel(j) {
   const L = { name: j.name || '自定义关卡', rings: [], clips: [], errors: [], theme: j.theme === 'letters' ? 'letters' : 'rings', word: j.word || '' };
-  (j.rings || []).forEach(r => { if (r && isFinite(r.x) && isFinite(r.y)) L.rings.push({ c: COLORS.includes(r.c) || /^#[0-9a-f]{6}$/i.test(r.c) ? r.c : 'red', x: +r.x, y: +r.y, gap: isFinite(r.gap) ? +r.gap : 90, ...(r.ch ? { ch: String(r.ch).toUpperCase().slice(0, 1), rot: +r.rot || 0, h: +r.h || 140 } : {}) }); else L.errors.push(r); });
+  (j.rings || []).forEach(r => { if (r && isFinite(r.x) && isFinite(r.y)) L.rings.push({ c: COLORS.includes(r.c) || /^#[0-9a-f]{6}$/i.test(r.c) ? r.c : 'red', x: +r.x, y: +r.y, gap: isFinite(r.gap) ? +r.gap : 90, ...(r.ch ? { ch: String(r.ch).toUpperCase().slice(0, 1), rot: +r.rot || 0, h: +r.h || 140, ...(+r.sx && +r.sx !== 1 ? { sx: +r.sx } : {}) } : {}) }); else L.errors.push(r); });
   (j.clips || []).forEach(c => { if (c && L.rings[c.o] && L.rings[c.g] && c.o !== c.g) L.clips.push({ o: c.o | 0, g: c.g | 0, x: isFinite(c.x) ? +c.x : (L.rings[c.o].x + L.rings[c.g].x) / 2, y: isFinite(c.y) ? +c.y : (L.rings[c.o].y + L.rings[c.g].y) / 2, ...(isFinite(c.rx) ? { rx: +c.rx, ry: +c.ry } : {}) }); else L.errors.push(c); });
   return L;
 }
 export const levelKey = S => S.theme === 'letters' ? 'levelJsonL' : 'levelJson';
+// 糖果风格 CAKE 参考关：按 style_candy.png 实测位置/尺寸（参考内容区 413×735 → 720×1280，×1.743）
+export const slotP = S => S.theme === 'letters' && S.letterStyle === 'candy' ? { w: S.candySlotW, h: S.candySlotH, gap: S.candySlotGap, y: S.candySlotY } : { w: S.slotW, h: S.slotH, gap: S.slotGap, y: S.slotY };
+export const CANDY_CAKE = { theme: 'letters', word: 'CAKE', rings: [{ c: 'orange', ch: 'C', x: 212, y: 763, rot: 180, h: 194, sx: 1.04 }, { c: 'teal', ch: 'A', x: 336, y: 520, rot: 0, h: 182, sx: 1.42 }, { c: 'purple', ch: 'K', x: 482, y: 776, rot: 0, h: 170, sx: 1.16 }, { c: 'yellow', ch: 'E', x: 222, y: 1016, rot: 0, h: 174, sx: 1.3 }],
+  clips: [{ o: 1, g: 0, x: 244, y: 669, rx: 271, ry: 606 }, { o: 2, g: 0, x: 307, y: 762, rx: 419, ry: 762 }, { o: 0, g: 3, x: 237, y: 945, rx: 237, ry: 864 }] };
 export function levelFromSettings(S) {
   const j = S[levelKey(S)], lt = S.theme === 'letters';
   if (j && j.trim()) { try { const L = normalizeLevel({ ...JSON.parse(j), ...(lt ? { theme: 'letters' } : {}) }); if (L.rings.length) return L; } catch (e) { console.warn('关卡 JSON 无效，使用参考关卡', e); } }
-  if (lt) { const w = (S.word || 'CAKE').toUpperCase(), base = WORD_REFS[w] && !S.wordSeed ? JSON.parse(JSON.stringify(WORD_REFS[w])) : JSON.parse(JSON.stringify(wordLevel(w, (S.wordSeed | 0) + 1, S)));
-    if ((S.letterStyle || 'ref') !== 'ref') spreadLevel(base, S.thickSpread || 1.3, S.thickScale || 1.2); return normalizeLevel(snapLetterClips(base)); }
+  if (lt) { const w = (S.word || 'CAKE').toUpperCase(), candyRef = S.letterStyle === 'candy' && w === 'CAKE' && !S.wordSeed; if (candyRef) return normalizeLevel(snapLetterClips(JSON.parse(JSON.stringify(CANDY_CAKE)))); const base = WORD_REFS[w] && !S.wordSeed ? JSON.parse(JSON.stringify(WORD_REFS[w])) : JSON.parse(JSON.stringify(wordLevel(w, (S.wordSeed | 0) + 1, S)));
+    if ((S.letterStyle || 'ref') !== 'ref') spreadLevel(base, S.thickSpread || 1.3, (S.thickScale || 1.2) * (S.letterStyle === 'candy' ? S.candyScale || 1 : 1)); return normalizeLevel(snapLetterClips(base)); }
   return normalizeLevel(REF_LEVEL);
 }
 // 可解性：反复取下“可取下”的环
@@ -162,12 +166,12 @@ export class Game {
   blockers(i) { const g = this.gone(); return this.L.clips.map((c, k) => (c.o === i && !g[c.g] && !c.rel) ? k : -1).filter(k => k >= 0); }
   grips(i) { const g = this.gone(); return this.L.clips.filter(c => c.g === i && !g[c.o] && !c.rel); }
   get lt() { return isLetters(this.L); }
-  polys(i) { const b = this.L.rings[i]; return glyphPolys(b.ch, b.h || 140, (b.rot || 0) + this.rings[i].rot); }
+  polys(i) { const b = this.L.rings[i]; return glyphPolysS(b, (b.rot || 0) + this.rings[i].rot); }
   // 字母主题：飞入顶部单词槽的位置
   slotOf(i) { const w = (this.L.word || '').toUpperCase(), used = this.rings.filter(r => r.slot != null).map(r => r.slot); let k = -1; for (let j = 0; j < w.length; j++) if (w[j] === this.L.rings[i].ch && !used.includes(j)) { k = j; break; } if (k < 0) k = used.length; return k; }
   // 参考：脱出时先沿杆方向滑出（主人字母拔出杆 / 被穿字母从杆端滑下）
   slideDir(i) { let x = 0, y = 0; for (const c of this.L.clips) { if (c.rx == null) continue; const dx = c.x - c.rx, dy = c.y - c.ry, n = Math.hypot(dx, dy) || 1; if (c.o === i) { x -= dx / n; y -= dy / n; } else if (c.g === i) { x += dx / n; y += dy / n; } } const n = Math.hypot(x, y); return n > 1e-3 ? [x / n, y / n] : [0, -1]; }
-  slotXY(k) { const S = this.S, n = Math.max(1, (this.L.word || '').length), w = S.slotW, gp = S.slotGap, x0 = 360 - (n * w + (n - 1) * gp) / 2; return [x0 + k * (w + gp) + w / 2, S.slotY + S.slotH / 2]; }
+  slotXY(k) { const S = this.S, SP = slotP(S), n = Math.max(1, (this.L.word || '').length), w = SP.w, gp = SP.gap, x0 = 360 - (n * w + (n - 1) * gp) / 2; return [x0 + k * (w + gp) + w / 2, SP.y + SP.h / 2]; }
   // 环 i 当前的屏幕变换（中心 / 旋转° / 缩放 / 不透明度）
   xf(i) {
     const r = this.rings[i], b = this.L.rings[i];

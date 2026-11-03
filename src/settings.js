@@ -1,7 +1,7 @@
 // 解环核玩工具 —— 设置定义（中文标签），版本号 + 迁移。通用分组 / 键名按 game-toolkit-standard/TOOLKIT_STANDARD.md
 import { h5DeviceSelectOptions } from './h5/index.js';
-export const APP_VERSION = '1.11.0';
-export const SETTINGS_VERSION = 13;
+export const APP_VERSION = '1.12.0';
+export const SETTINGS_VERSION = 14;
 export const STORE_KEY = 'ringUntangleTool.settings';
 export const APP_ID = 'ring-untangle-tool';
 const ALL8 = 'applovin,facebook,google,mintegral,moloco,tiktok,unity,generic';
@@ -11,13 +11,19 @@ export const GROUPS = [
     ['letterStyle', '字母风格（几何/管径）', 'select', 'ref', [['ref', '参考视频（细管）'], ['thick', '粗管（参考 style_cake_wood）'], ['candy', '糖果软胶（粗管亮色，参考 style_candy）']]],
     ['connStyle', '连接件风格（可与字母风格任意组合）', 'select', 'beadRod', [['beadRod', '珠杆（米色圆珠 + 深色细杆）'], ['collar', '金属套筒短杆（套筒—短杆—套筒）'], ['clasp', '同色方扣细杆（主人同色细杆 + 圆角方扣）']]],
     ['materialTheme', '材质主题（auto = 跟随字母风格）', 'select', 'auto', [['auto', '自动（糖果风格 → 糖果软胶，其余 → 光泽金属漆）'], ['gloss', '光泽金属漆'], ['candy', '糖果软胶（高光清漆、零金属）']]],
-    ['candyTube', '糖果：字母管半径(px)', 'range', 17, 8, 40, 0.5],
-    ['candyRough', '糖果：粗糙度', 'range', 0.3, 0, 1, 0.01],
-    ['candyGlow', '糖果：通透自发光', 'range', 0.14, 0, 0.6, 0.01],
-    ['candy_teal', '糖果色：青(A)', 'color', '#1ec4f7'], ['candy_orange', '糖果色：橙(C)', 'color', '#ff8a1c'], ['candy_purple', '糖果色：紫(K)', 'color', '#9b22f2'], ['candy_yellow', '糖果色：黄(E)', 'color', '#ffc31f'],
+    ['candyTube', '糖果：字母管半径(px，参考≈23)', 'range', 23, 8, 40, 0.5],
+    ['candyFlat', '糖果：充气厚度(前后压扁，1 = 圆管)', 'range', 0.5, 0.2, 1, 0.01],
+    ['candyExposure', '糖果：曝光倍数(防止高饱和色溢出偏色)', 'range', 1, 0.3, 2, 0.01], ['candyLight', '糖果：主光倍数', 'range', 0.7, 0, 2, 0.01], ['candyAmb', '糖果：额外环境光', 'range', 1.0, 0, 3, 0.01],
+    ['candySide', '糖果：侧壁厚度(向右下挤出 px)', 'range', 4, 0, 20, 0.5], ['candySideDark', '糖果：侧壁暗度', 'range', 0.8, 0.2, 1, 0.01], ['claspLight', '方扣/细杆：比主人颜色提亮', 'range', 0.06, 0, 0.8, 0.01],
+    ['candyScale', '糖果：生成关字高额外放大', 'range', 1.15, 0.8, 2, 0.01],
+    ['candyShA', '糖果：投影浓度', 'range', 0.42, 0, 1, 0.01], ['candyShBlur', '糖果：投影模糊(px)', 'range', 9, 0, 40, 0.5], ['candyShDX', '糖果：投影偏移X', 'range', 7, -40, 40, 0.5], ['candyShDY', '糖果：投影偏移Y', 'range', 10, -40, 40, 0.5], ['candyContact', '糖果：接触阴影', 'range', 0.35, 0, 1, 0.01],
+    ['candySlotW', '糖果：槽宽', 'range', 112, 20, 200, 1], ['candySlotH', '糖果：槽高', 'range', 134, 20, 220, 1], ['candySlotGap', '糖果：槽间距', 'range', 11, 0, 40, 1], ['candySlotY', '糖果：槽顶 Y', 'range', 116, 0, 600, 1],
+    ['candyRough', '糖果：粗糙度', 'range', 0.45, 0, 1, 0.01],
+    ['candyGlow', '糖果：通透自发光', 'range', 0.5, 0, 0.6, 0.01],
+    ['candy_teal', '糖果色：青(A)', 'color', '#00caff'], ['candy_orange', '糖果色：橙(C)', 'color', '#fe8316'], ['candy_purple', '糖果色：紫(K)', 'color', '#9a17f5'], ['candy_yellow', '糖果色：黄(E)', 'color', '#ffb518'],
     ['candy_red', '糖果色：红', 'color', '#ff3b4e'], ['candy_pink', '糖果色：粉', 'color', '#ff5fb4'], ['candy_green', '糖果色：绿', 'color', '#3fd35a'], ['candy_blue', '糖果色：蓝', 'color', '#3a6dff'],
-    ['candyBgTop', '糖果：背景顶部(奶油色)', 'color', '#f9eedd'], ['candyBgBottom', '糖果：背景底部', 'color', '#f6e9d6'],
-    ['claspR', '方扣：半边长(×管半径)', 'range', 1.32, 1.02, 2.2, 0.01], ['claspLen', '方扣：沿笔画长度(×管半径)', 'range', 1.7, 0.6, 4, 0.05], ['claspRodR', '方扣：细杆半径(×管半径)', 'range', 0.26, 0.05, 0.6, 0.01],
+    ['candyBgTop', '糖果：背景顶部(奶油色)', 'color', '#f9eedc'], ['candyBgBottom', '糖果：背景底部', 'color', '#f8ecd8'],
+    ['claspR', '方扣：半边长(×管半径)', 'range', 1.5, 1.02, 2.4, 0.01], ['claspLen', '方扣：沿笔画长度(×管半径)', 'range', 2.0, 0.6, 4, 0.05], ['claspRodR', '方扣：细杆半径(×管半径)', 'range', 0.32, 0.05, 0.6, 0.01],
     ['thickTube', '粗管套筒：字母管半径(px，参考图≈0.15×字高)', 'range', 20, 8, 40, 0.5],
     ['thickSpread', '粗管套筒：布局拉开倍数', 'range', 1.3, 1, 2, 0.01],
     ['thickScale', '粗管套筒：字高放大倍数', 'range', 1.2, 0.8, 2, 0.01],
@@ -257,7 +263,7 @@ export const GROUPS = [
 export const DEFS = {};
 for (const [, items] of GROUPS) for (const it of items) if (it[2] !== 'button') DEFS[it[0]] = it[3];
 // v2（材质/建模复刻）：仍等于 v1 默认值的项换成新默认
-export const OLD_DEFAULTS = { 13: { materialTheme: 'gloss' }, 12: {}, 11: { beadR: 1.9, beadLen: 1.45, beadColor: '#eadcb6', rodR: 2.4 }, 10: {}, 9: {}, 8: { col_red: '#e0343f', col_purple: '#8c2c98', col_green: '#529a28', col_teal: '#1c7c48', col_yellow: '#d88a1e', col_gold: '#b08a3c', clipMetal: 0.55, clipGold: 0.7, col_blue: '#2f52b0', col_pink: '#c8363c' }, 7: { flyDur: 420, flyDist: 110, flyLift: 40, flyScale: 1.12, flySpin: 35, ambInt: 0.45, fillInt: 0.4, envInt: 1.25, exposure: 1.12, envDark: '#8a847c', col_orange: '#ea6d27', col_pink: '#d6464e', col_green: '#62aa36', col_teal: '#24905a', col_purple: '#9a33aa', col_blue: '#3159bd', envBoxH: 5.5, clearcoatRough: 0.22, envWarm: '#b4732e', col_yellow: '#d8891a', clipRough: 0.18, clipMetal: 0.6, clipGold: 0.45, col_gold: '#b8903a', clipClearcoatRough: 0.04, sleeveR: 1.62, sleeveLen: 2.9, depthBlur: 1.2, grain: 0.05, specInt: 1.0 }, 6: { roughness: 0.3, clearcoatRough: 0.12, col_yellow: '#dc901c', envWarm: '#c08a50' }, 5: { metalness: 0.6, roughness: 0.26, clearcoatRough: 0.08, clipMetal: 0.8, clipRough: 0.16, envBoxes: 1, envDark: '#77716a' }, 4: { metalness: 0, roughness: 0.4, clearcoat: 0.2, clearcoatRough: 0.65, sheen: 0.15, envInt: 0.6, specTint: 0.25, exposure: 0.8, clipMetal: 0.45, clipRough: 0.24, clipClearcoat: 0.8, clipClearcoatRough: 0.18, clipEnvInt: 1.3, lightInt: 3.8, ambInt: 0.35, fillInt: 0.35, sss: 0.0 }, 3: { sleeveR: 1.42, sleeveLen: 2.5, sleeveBevel: 0.2, roughness: 0.5, clearcoat: 0.25, clearcoatRough: 0.5, sheen: 0.35, envInt: 0.5, shadowAlpha: 0.3, shadowBlur: 14, shadowDX: 4, shadowDY: 16, col_red: '#d8303a', col_orange: '#e86a25', col_yellow: '#e9a72f-old', col_green: '#4f9f2a', col_teal: '#22894a', col_blue: '#2f55b8', col_purple: '#9530a8' }, 2: { ringR: 90, tubeR: 14, gapDeg: 52, roughness: 0.38, lightInt: 2.4, ambInt: 1.25, clipTint: 0.08, col_red: '#d9484b', col_orange: '#e8782f', col_yellow: '#e9b23c', col_green: '#3fa83f', col_teal: '#2b8f52', col_blue: '#3a5fc6', col_purple: '#9b3fb8', shadowAlpha: 0.22, shadowBlur: 10, shadowDX: 6, shadowDY: 12, bgTop: '#c4c3c4' } };
+export const OLD_DEFAULTS = { 14: { candyTube: 17, candyRough: 0.3, candyGlow: 0.14, claspR: 1.32, claspLen: 1.7, claspRodR: 0.26, candy_teal: '#1ec4f7', candy_purple: '#9b22f2', candy_yellow: '#ffc31f', candyBgTop: '#f9eedd', candyBgBottom: '#f6e9d6' }, 13: { materialTheme: 'gloss' }, 12: {}, 11: { beadR: 1.9, beadLen: 1.45, beadColor: '#eadcb6', rodR: 2.4 }, 10: {}, 9: {}, 8: { col_red: '#e0343f', col_purple: '#8c2c98', col_green: '#529a28', col_teal: '#1c7c48', col_yellow: '#d88a1e', col_gold: '#b08a3c', clipMetal: 0.55, clipGold: 0.7, col_blue: '#2f52b0', col_pink: '#c8363c' }, 7: { flyDur: 420, flyDist: 110, flyLift: 40, flyScale: 1.12, flySpin: 35, ambInt: 0.45, fillInt: 0.4, envInt: 1.25, exposure: 1.12, envDark: '#8a847c', col_orange: '#ea6d27', col_pink: '#d6464e', col_green: '#62aa36', col_teal: '#24905a', col_purple: '#9a33aa', col_blue: '#3159bd', envBoxH: 5.5, clearcoatRough: 0.22, envWarm: '#b4732e', col_yellow: '#d8891a', clipRough: 0.18, clipMetal: 0.6, clipGold: 0.45, col_gold: '#b8903a', clipClearcoatRough: 0.04, sleeveR: 1.62, sleeveLen: 2.9, depthBlur: 1.2, grain: 0.05, specInt: 1.0 }, 6: { roughness: 0.3, clearcoatRough: 0.12, col_yellow: '#dc901c', envWarm: '#c08a50' }, 5: { metalness: 0.6, roughness: 0.26, clearcoatRough: 0.08, clipMetal: 0.8, clipRough: 0.16, envBoxes: 1, envDark: '#77716a' }, 4: { metalness: 0, roughness: 0.4, clearcoat: 0.2, clearcoatRough: 0.65, sheen: 0.15, envInt: 0.6, specTint: 0.25, exposure: 0.8, clipMetal: 0.45, clipRough: 0.24, clipClearcoat: 0.8, clipClearcoatRough: 0.18, clipEnvInt: 1.3, lightInt: 3.8, ambInt: 0.35, fillInt: 0.35, sss: 0.0 }, 3: { sleeveR: 1.42, sleeveLen: 2.5, sleeveBevel: 0.2, roughness: 0.5, clearcoat: 0.25, clearcoatRough: 0.5, sheen: 0.35, envInt: 0.5, shadowAlpha: 0.3, shadowBlur: 14, shadowDX: 4, shadowDY: 16, col_red: '#d8303a', col_orange: '#e86a25', col_yellow: '#e9a72f-old', col_green: '#4f9f2a', col_teal: '#22894a', col_blue: '#2f55b8', col_purple: '#9530a8' }, 2: { ringR: 90, tubeR: 14, gapDeg: 52, roughness: 0.38, lightInt: 2.4, ambInt: 1.25, clipTint: 0.08, col_red: '#d9484b', col_orange: '#e8782f', col_yellow: '#e9b23c', col_green: '#3fa83f', col_teal: '#2b8f52', col_blue: '#3a5fc6', col_purple: '#9b3fb8', shadowAlpha: 0.22, shadowBlur: 10, shadowDX: 6, shadowDY: 12, bgTop: '#c4c3c4' } };
 export function migrate(obj) {
   if (!obj || typeof obj !== 'object') return { ...DEFS };
   let v = obj.version || 0; const s = { ...(obj.settings || obj) };

@@ -31,9 +31,10 @@ export const GLYPHS = {
 export const LETTERS = Object.keys(GLYPHS);
 // 'a' 圆弧在屏幕坐标中：角度 θ 点 = (cx + r cosθ, cy + r sinθ)，从 a0 走到 a1（a1<a0 时逆向）
 // 采样成折线（设计像素，h = 字高；C 的开口方向由 gapDeg 旋转）
-export function glyphPolys(ch, h, rotDeg = 0) {
+export const glyphPolysS = (b, rot) => glyphPolys(b.ch, b.h || 140, rot, b.sx || 1);
+export function glyphPolys(ch, h, rotDeg = 0, sx = 1) {
   const st = GLYPHS[ch] || GLYPHS.I, out = [], cr = Math.cos(rotDeg * Math.PI / 180), sr = Math.sin(rotDeg * Math.PI / 180);
-  const P = (x, y) => [h * (x * cr - y * sr), h * (x * sr + y * cr)];
+  const P = (x, y) => (x *= sx, [h * (x * cr - y * sr), h * (x * sr + y * cr)]);
   for (const s of st) {
     if (s[0] === 'l') out.push([P(s[1], s[2]), P(s[3], s[4])]);
     else { const [, cx, cy, r, a0, a1] = s, n = Math.max(8, Math.round(Math.abs(a1 - a0) / 6)), pts = []; for (let k = 0; k <= n; k++) { const t = (a0 + (a1 - a0) * k / n) * Math.PI / 180; pts.push(P(cx + r * Math.cos(t), cy + r * Math.sin(t))); } out.push(pts); }

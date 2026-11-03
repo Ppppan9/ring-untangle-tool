@@ -3,10 +3,10 @@
 // 扣子 = 圆角套管（LatheGeometry，圆角矩形截面绕轴旋转），套在“被扣住”的环管上，颜色 = 主人环颜色；离主人环较远的扣子用短柱连到主人环。
 // 材质 = MeshPhysicalMaterial（哑光塑料 + 轻清漆 + 绒光），RoomEnvironment PMREM 环境光 + 柔和主光，ACES / AgX 色调映射。
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import { glyphPolys, glyphNearest, LTUBE } from './glyphs.js';
+import { glyphPolys, glyphPolysS, glyphNearest, LTUBE } from './glyphs.js';
 // 材质主题轴（与模型风格独立）：目前只有当前光泽金属漆；以后新增材质在此表里加一项（覆盖 mkMat 参数）
 export const MATERIAL_THEMES = { gloss: { zh: '光泽金属漆', ring: {}, conn: {} },
-  candy: { zh: '糖果软胶', ring: { metalness: 0, clearcoat: 1, clearcoatRoughness: 0.06, sheen: 0, iridescence: 0, specularIntensity: 0.55, envMapIntensity: 0.5 }, conn: {} } };
+  candy: { zh: '糖果软胶', ring: { metalness: 0, clearcoat: 0.25, clearcoatRoughness: 0.4, sheen: 0, iridescence: 0, specularIntensity: 0.15, envMapIntensity: 0.15 }, conn: {} } };
 export const matTheme = S => MATERIAL_THEMES[S.materialTheme] ? S.materialTheme : (S.letterStyle === 'candy' ? 'candy' : 'gloss');
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
@@ -59,7 +59,7 @@ export class Scene3D {
     this.groups = []; this.key = '';
   }
   build(L, S) {
-    const key = JSON.stringify([L.rings, L.clips, L.theme, ['whiteModel', 'whiteColor', 'letterTube', 'letterStyle', 'connStyle', 'candyTube', 'candyRough', 'candyGlow', 'claspR', 'claspLen', 'claspRodR', 'candy_teal', 'candy_orange', 'candy_purple', 'candy_yellow', 'candy_red', 'candy_pink', 'candy_green', 'candy_blue', 'thickTube', 'collarR', 'collarLen', 'collarRodR', 'collarColor', 'collarRough', 'materialTheme', 'beadColor', 'beadTube', 'beadRough', 'rodColor', 'rodR', 'beadR', 'beadLen', 'hl_pink', 'hl_red', 'hl_orange', 'hl_yellow', 'hl_green', 'hl_teal', 'hl_blue', 'hl_purple', 'ringR', 'tubeR', 'gapDeg', 'clipSize', 'roughness', 'clearcoat', 'clearcoatRough', 'sheen', 'envInt', 'clipTint', 'sleeveR', 'sleeveLen', 'sleeveBevel', 'clipRough', 'clipMetal', 'clipClearcoat', 'clipClearcoatRough', 'clipEnvInt', 'metalness', 'specInt', 'specTint', 'iridescence', 'stemMin', 'clipGold', 'crossDepth', 'crossWidth', 'meshQuality', 'sss'].map(k => S[k]), ['red', 'pink', 'orange', 'yellow', 'green', 'teal', 'blue', 'purple'].map(k => S['col_' + k])]);
+    const key = JSON.stringify([L.rings, L.clips, L.theme, ['whiteModel', 'whiteColor', 'letterTube', 'letterStyle', 'connStyle', 'candyTube', 'candyFlat', 'candySide', 'candySideDark', 'claspLight', 'candyRough', 'candyGlow', 'claspR', 'claspLen', 'claspRodR', 'candy_teal', 'candy_orange', 'candy_purple', 'candy_yellow', 'candy_red', 'candy_pink', 'candy_green', 'candy_blue', 'thickTube', 'collarR', 'collarLen', 'collarRodR', 'collarColor', 'collarRough', 'materialTheme', 'beadColor', 'beadTube', 'beadRough', 'rodColor', 'rodR', 'beadR', 'beadLen', 'hl_pink', 'hl_red', 'hl_orange', 'hl_yellow', 'hl_green', 'hl_teal', 'hl_blue', 'hl_purple', 'ringR', 'tubeR', 'gapDeg', 'clipSize', 'roughness', 'clearcoat', 'clearcoatRough', 'sheen', 'envInt', 'clipTint', 'sleeveR', 'sleeveLen', 'sleeveBevel', 'clipRough', 'clipMetal', 'clipClearcoat', 'clipClearcoatRough', 'clipEnvInt', 'metalness', 'specInt', 'specTint', 'iridescence', 'stemMin', 'clipGold', 'crossDepth', 'crossWidth', 'meshQuality', 'sss'].map(k => S[k]), ['red', 'pink', 'orange', 'yellow', 'green', 'teal', 'blue', 'purple'].map(k => S['col_' + k])]);
     if (key === this.key) return; this.key = key;
     for (const g of this.groups) { this.root.remove(g); g.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); }
     this.groups = []; this.clipMeshes = [];
@@ -92,17 +92,17 @@ export class Scene3D {
   // 字母主题：每个字母 = 若干管状笔画（直线 / 圆弧，端点与拐角用球补圆）；扣子 = 米色珠（套在被扣字母笔画上）+ 黑色细杆（连到主人字母）
   buildLetters(L, S, mkMat, q, W, wc) {
     const mtk = matTheme(S), MT = MATERIAL_THEMES[mtk], CS = S.connStyle || 'beadRod', thick = CS === 'collar', clasp = CS === 'clasp';
-    const r = LTUBE(S), cap = new THREE.SphereGeometry(r, Math.round(32 * q), Math.round(20 * q));
+    const r = LTUBE(S), flat = S.letterStyle === 'candy' ? S.candyFlat : 1, cap = new THREE.SphereGeometry(r, Math.round(32 * q), Math.round(20 * q)); if (flat !== 1) cap.scale(1, 1, flat);
     const sr = r * S.beadR, bead = new THREE.TorusGeometry((sr + r * 1.02) / 2, (sr - r * 1.02) / 2, Math.round(24 * q), Math.round(48 * q)), rod = new THREE.CylinderGeometry(S.rodR, S.rodR, 1, 20);
     bead.scale(1, 1, S.beadLen); bead.rotateX(Math.PI / 2); // 圆润甜甜圈珠：轴 = 局部 y
     const ball = new THREE.SphereGeometry(r * 0.75, 24, 16);
     L.rings.forEach((b, i) => {
-      const g = new THREE.Group(); g.userData.i = i; const mat = mkMat(colorOf(S, b.c), false, S['hl_' + b.c] ?? 1); Object.assign(mat, MT.ring); if (mtk === 'candy') { mat.roughness = S.candyRough; mat.emissiveIntensity = W ? 0 : S.candyGlow; } g.userData.mats = [mat];
-      const P = glyphPolys(b.ch, b.h || 140, b.rot || 0);
+      const g = new THREE.Group(); g.userData.i = i; const mat = mkMat(colorOf(S, b.c), false, S['hl_' + b.c] ?? 1); Object.assign(mat, MT.ring); let side = null; if (mtk === 'candy') { mat.roughness = S.candyRough; mat.emissiveIntensity = W ? 0 : S.candyGlow; } if (S.letterStyle === 'candy' && S.candySide > 0) { side = mat.clone(); side.color = mat.color.clone().multiplyScalar(S.candySideDark); side.emissive = side.color.clone(); side.emissiveIntensity = mat.emissiveIntensity * 0.6; } g.userData.mats = side ? [mat, side] : [mat];
+      const P = glyphPolysS(b, b.rot || 0);
       for (const pl of P) {
         const pts = pl.map(([x, y]) => new THREE.Vector3(x, -y, 0)), curve = pts.length === 2 ? new THREE.LineCurve3(pts[0], pts[1]) : new THREE.CatmullRomCurve3(pts, false, 'centripetal');
-        const m = new THREE.Mesh(new THREE.TubeGeometry(curve, pts.length === 2 ? 2 : Math.round(pts.length * 3 * q), r, Math.round(32 * q), false), mat); m.castShadow = m.receiveShadow = true; g.add(m);
-        for (const v of [pts[0], pts[pts.length - 1]]) { const c = new THREE.Mesh(cap, mat); c.position.copy(v); c.castShadow = true; g.add(c); }
+        const tgeo = new THREE.TubeGeometry(curve, pts.length === 2 ? 2 : Math.round(pts.length * 3 * q), r, Math.round(32 * q), false); if (flat !== 1) tgeo.scale(1, 1, flat); const m = new THREE.Mesh(tgeo, mat); m.castShadow = m.receiveShadow = true; g.add(m); if (side) { const w = new THREE.Mesh(tgeo, side); w.position.set(S.candySide * 0.6, -S.candySide, -r * flat * 0.5); g.add(w); }
+        for (const v of [pts[0], pts[pts.length - 1]]) { const c = new THREE.Mesh(cap, mat); c.position.copy(v); c.castShadow = true; g.add(c); if (side) { const w = new THREE.Mesh(cap, side); w.position.copy(v).add(new THREE.Vector3(S.candySide * 0.6, -S.candySide, -r * flat * 0.5)); g.add(w); } }
       }
       g.position.set(b.x, -b.y, 0); this.root.add(g); this.groups.push(g);
     });
@@ -111,9 +111,9 @@ export class Scene3D {
       const o = L.rings[c.o], gb = L.rings[c.g], go = this.groups[c.o]; if (!go) return;
       const bm = new THREE.MeshPhysicalMaterial({ color: W ? wc : S.beadColor, roughness: S.beadRough, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.15, sheen: 0.4, sheenColor: new THREE.Color('#fff6dc'), envMapIntensity: 1.1, emissive: new THREE.Color(W ? wc : S.beadColor), emissiveIntensity: 0 }); go.userData.mats.push(bm); this.clipMeshes[k] = bm; // 参考：米色圆珠 + 深色细杆
       const rm = new THREE.MeshPhysicalMaterial({ color: W ? wc : S.rodColor, roughness: 0.3, metalness: 0.5, clearcoat: 0.6, envMapIntensity: 0.9 }); go.userData.mats.push(rm);
-      const tg = glyphNearest(glyphPolys(gb.ch, gb.h || 140, gb.rot || 0), c.x - gb.x, c.y - gb.y), qo = glyphNearest(glyphPolys(o.ch, o.h || 140, o.rot || 0), (c.rx ?? c.x) - o.x, (c.ry ?? c.y) - o.y);
+      const tg = glyphNearest(glyphPolysS(gb, gb.rot || 0), c.x - gb.x, c.y - gb.y), qo = glyphNearest(glyphPolysS(o, o.rot || 0), (c.rx ?? c.x) - o.x, (c.ry ?? c.y) - o.y);
       if (clasp) { // 同色方扣细杆：主人同色细杆从主人笔画伸出，末端圆角方扣包住被扣字母笔画
-        const cm = go.userData.mats[0].clone(); go.userData.mats.push(cm); this.clipMeshes[k] = cm;
+        const cm = go.userData.mats[0].clone(); if (!W) { cm.color.lerp(new THREE.Color('#ffffff'), S.claspLight); cm.emissive = cm.color.clone(); } cm.userData.ei = cm.emissiveIntensity; go.userData.mats.push(cm); this.clipMeshes[k] = cm;
         const h = r * S.claspR, box = new RoundedBoxGeometry(h * 2, r * S.claspLen, h * 2, 4, Math.min(h, r * S.claspLen / 2) * 0.45), rodT = new THREE.CylinderGeometry(r * S.claspRodR, r * S.claspRodR, 1, 20);
         const bx = c.x - o.x, by = -(c.y - o.y), ax = qo.x, ay = -qo.y, m = new THREE.Mesh(box, cm); m.position.set(bx, by, 0); m.rotation.z = -tg.ang - Math.PI / 2; m.castShadow = m.receiveShadow = true; go.add(m);
         const dx = ax - bx, dy = ay - by, len = Math.hypot(dx, dy); if (len > 1) { const st = new THREE.Mesh(rodT, cm); st.scale.y = len; st.position.set((ax + bx) / 2, (ay + by) / 2, 0); st.rotation.z = Math.atan2(dy, dx) - Math.PI / 2; st.castShadow = true; go.add(st); }
@@ -152,7 +152,7 @@ export class Scene3D {
     this.makeEnv(S);
     const c = this.cam; c.left = view.x0; c.right = view.x0 + view.w; c.top = -view.y0; c.bottom = -(view.y0 + view.h); c.updateProjectionMatrix();
     const R = this.renderer; R.toneMapping = (S.theme === 'letters' && matTheme(S) === 'candy' && !S.whiteModel) ? TONE.neutral : TONE[S.toneMap] ?? THREE.ACESFilmicToneMapping; // 糖果：中性色调映射，保留高饱和 R.toneMappingExposure = S.exposure;
-    this.amb.intensity = S.ambInt; this.sun.intensity = S.lightInt; this.fill.intensity = S.fillInt;
+    this.amb.intensity = S.ambInt; this.sun.intensity = S.lightInt; this.fill.intensity = S.fillInt; if (S.theme === 'letters' && S.letterStyle === 'candy' && !S.whiteModel) { this.sun.intensity = S.lightInt * S.candyLight; this.amb.intensity = S.ambInt + S.candyAmb; R.toneMappingExposure = S.exposure * S.candyExposure; } // 糖果：主光收一点、环境光提亮 → 暗部保持饱和、高光柔和
     const la = rad(S.lightAz), le = rad(S.lightEl), cx = 360, cy = -760;
     this.sun.position.set(cx + 1500 * Math.cos(le) * Math.cos(la), cy + 1500 * Math.cos(le) * Math.sin(la), 1500 * Math.sin(le)); this.sun.target.position.set(cx, cy, 0);
     this.fill.position.set(cx - 1000 * Math.cos(la), cy - 1000 * Math.sin(la), 800);
@@ -163,7 +163,7 @@ export class Scene3D {
       g.position.set(f.x, -f.y, f.z || (f.op < 1 ? 80 : 0)); g.rotation.z = -rad(f.rot); g.scale.setScalar(f.sc);
       for (const m of g.userData.mats) { const tr = f.op < 0.999; if (m.transparent !== tr) { m.transparent = tr; m.needsUpdate = true; } m.opacity = f.op; m.depthWrite = !tr; }
     });
-    if (this.clipMeshes) this.clipMeshes.forEach((m, k) => { if (m) { const fl = flash[k] || 0; m.emissive.set(fl > 0.01 ? '#ff2020' : m.userData.em || (m.userData.em = '#' + m.emissive.getHexString())); m.emissiveIntensity = fl > 0.01 ? fl * 0.9 : S.sss; } });
+    if (this.clipMeshes) this.clipMeshes.forEach((m, k) => { if (m) { const fl = flash[k] || 0; m.emissive.set(fl > 0.01 ? '#ff2020' : m.userData.em || (m.userData.em = '#' + m.emissive.getHexString())); m.emissiveIntensity = fl > 0.01 ? fl * 0.9 : m.userData.ei ?? S.sss; } });
     R.render(this.scene, this.cam);
     return this.canvas;
   }
