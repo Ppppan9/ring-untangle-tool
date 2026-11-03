@@ -208,14 +208,14 @@ export class Game {
     if (this.lt) { // 字母：可连续旋转（C 转到缺口对准米珠即可脱扣）；其他字母只做小幅晃动
       const an = Math.atan2(y - r.py, x - r.px); let d = an - D.last; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; D.last = an; D.cum += d;
       const b = this.L.rings[D.i], spin = ROTG(this.S, b.ch);
-      if (!spin) { const [ux, uy] = this.slideDir(D.i), pr = Math.max(0, (x - D.x0) * ux + (y - D.y0) * uy), lim = D.free ? 1e9 : this.S.blockSlide ?? 8; const q = Math.min(pr, lim); r.off = [ux * q, uy * q]; D.slide = pr; return; } // 直线字母：只能沿杆拖 const mx = spin ? 1e9 : (D.free ? this.S.dragMaxDeg : this.S.blockMaxDeg);
+      if (!spin) { const [ux, uy] = this.slideDir(D.i), pr = Math.max(0, (x - D.x0) * ux + (y - D.y0) * uy), lim = D.free ? 1e9 : this.S.blockSlide ?? 8; const q = Math.min(pr, lim); r.off = [ux * q, uy * q]; D.slide = pr; return; } /* 直线字母：只能沿杆拖 */ const mx = spin ? 1e9 : (D.free ? this.S.dragMaxDeg : this.S.blockMaxDeg);
       r.rot = D.base + clamp(D.cum * 180 / Math.PI * (spin ? 1 : this.S.dragFollow), -mx, mx);
       if (spin) this.L.clips.forEach((c, k) => { if (c.g !== D.i || c.rel || this.gone()[c.o]) return; if (!/[CG]/.test(b.ch)) { if (Math.abs(D.cum) * 180 / Math.PI >= 330) { c.rel = true; D.rel++; this.events.push({ type: 'release', k }); } return; } const phi = Math.atan2(c.y - b.y, c.x - b.x) * 180 / Math.PI, gd = (b.rot || 0) + r.rot; let df = ((phi - gd) % 360 + 540) % 360 - 180; if (Math.abs(df) < this.S.releaseDeg) { c.rel = true; D.rel++; this.events.push({ type: 'release', k }); } });
       return;
     }
     if ((this.S.pivotMode || 'center') === 'center') { // 绕谜题中心旋转：可取下的环可连续转动，被扣住的只能小幅晃动
       const an = Math.atan2(y - r.py, x - r.px); let d = an - D.last; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; D.last = an; D.cum += d;
-      r.rot = D.free ? D.cum * 180 / Math.PI : clamp(D.cum * 180 / Math.PI * this.S.dragFollow, -this.S.blockMaxDeg, this.S.blockMaxDeg); return; }
+      r.rot = D.free ? D.cum * 180 / Math.PI : clamp(D.cum * 180 / Math.PI * this.S.dragFollow, -this.S.blockMaxDeg, this.S.blockMaxDeg); if (D.free) { const st = Math.max(1, Math.ceil(Math.abs(d) * 180 / Math.PI / 5)); for (let k = st; k >= 1; k--) this.markPassed(D.i, r.rot - d * 180 / Math.PI * (k - 1) / st, D); } return; }
     const mx = D.free ? this.S.dragMaxDeg : this.S.blockMaxDeg; r.rot = clamp(da * 180 / Math.PI * this.S.dragFollow, -mx, mx);
   }
   release() {
@@ -224,7 +224,7 @@ export class Game {
       const okMove = spin ? Math.abs(D.cum) * 180 / Math.PI >= (this.S.exitDeg ?? 24) : (D.slide || 0) >= (this.S.slideNeed ?? 40); // 规则：旋转字母只能转出，直线字母只能沿杆拖出；不允许单击取下
       if (!(free && okMove)) { r.off = null; if (D.rel) return { ok: true, i: D.i, rel: true }; if (spin && this.isFree(D.i) && D.cum) return { ok: true, i: D.i, rel: false }; r.rot = D.base; r.shake = { t0: this.t, dur: this.S.shakeDur / 1000 }; this.events.push({ type: 'block', i: D.i }); return { ok: false, i: D.i, need: spin ? 'rotate' : 'slide' }; } r.off = null; }
     if (this.lt && this.isFree(D.i)) { r.slot = this.slotOf(D.i); r.state = 'fly'; r.fly = { t0: this.t, dur: this.S.letterFlyDur / 1000, slot: r.slot, sd: this.slideDir(D.i) }; this.events.push({ type: 'pop', i: D.i }); return { ok: true, i: D.i }; }
-    const needRot = !this.lt && D.free && !this.ringAligned(D.i, r.rot); // 参考/用户：必须转到缺口对准扣子（中心模式）或转够角度（扣子模式）才脱出；单击只晃动 // 参考：必须绕扣子转到位（缺口滑过扣子）才能脱出；单击/转不够只晃动
+    this._passed = D.passed; const needRot = !this.lt && D.free && !this.ringAligned(D.i, r.rot); this._passed = null; // 参考/用户：必须转到缺口对准扣子（中心模式）或转够角度（扣子模式）才脱出；单击只晃动 // 参考：必须绕扣子转到位（缺口滑过扣子）才能脱出；单击/转不够只晃动
     if (D.free && this.isFree(D.i) && !needRot) {
       const b = this.L.rings[D.i], f = this.xf(D.i); let dx = f.x - r.px, dy = f.y - r.py;
       { const c = this.centroid(); dx = b.x - c[0]; dy = b.y - c[1]; } // 参考：沿远离画面中心方向弹出
@@ -237,9 +237,9 @@ export class Game {
     if (this.S.blockFlash) for (const k of this.blockers(D.i)) this.clipFlash[k] = this.t;
     this.events.push({ type: 'block', i: D.i }); return { ok: false, i: D.i };
   }
-  ringNeed(i) { const b = this.L.rings[i], gr = this.grips(i); if (!gr.length) return (this.S.exitDeg ?? 24) + 6; const c = gr[0]; return wrap180(Math.atan2(c.y - b.y, c.x - b.x) * 180 / Math.PI - (b.gap ?? 90)); }
-  ringAligned(i, rot) { const gr = this.grips(i); if ((this.S.pivotMode || 'center') !== 'center') return !gr.length || Math.abs(rot) >= (this.S.exitDeg ?? 24); if (!gr.length) return Math.abs(rot) >= (this.S.exitDeg ?? 24); const b = this.L.rings[i];
-    return gr.every(c => Math.abs(wrap180(Math.atan2(c.y - b.y, c.x - b.x) * 180 / Math.PI - ((b.gap ?? 90) + rot))) <= (this.S.exitTol ?? 25)); }
+  ringNeed(i) { const b = this.L.rings[i], gr = this.grips(i); if (!gr.length) return (this.S.exitDeg ?? 24) + 6; const a = gr.map(c => ((Math.atan2(c.y - b.y, c.x - b.x) * 180 / Math.PI - (b.gap ?? 90)) % 360 + 360) % 360), pos = Math.max(...a), neg = Math.min(...a) - 360; return pos <= -neg ? pos + 4 : neg - 4; } // 缺口依次滑过所有扣子所需转角
+  ringAligned(i, rot) { const gr = this.grips(i); if ((this.S.pivotMode || 'center') !== 'center') return !gr.length || Math.abs(rot) >= (this.S.exitDeg ?? 24); if (!gr.length) return Math.abs(rot) >= (this.S.exitDeg ?? 24); const P = (this.drag && this.drag.passed) || this._passed || new Set(); return gr.every(c => P.has(c)); }
+  markPassed(i, rot, D) { const b = this.L.rings[i], tol = this.S.exitTol ?? 25; D.passed = D.passed || new Set(); for (const c of this.grips(i)) if (Math.abs(wrap180(Math.atan2(c.y - b.y, c.x - b.x) * 180 / Math.PI - ((b.gap ?? 90) + rot))) <= tol) D.passed.add(c); }
   centroid() { const a = this.L.rings; return [a.reduce((s, r) => s + r.x, 0) / a.length, a.reduce((s, r) => s + r.y, 0) / a.length]; }
   update(dt) {
     this.t += dt;
