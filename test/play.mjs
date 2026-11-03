@@ -60,7 +60,7 @@ ok(await p.evaluate(() => __game.G.rings.every(r => r.slot != null)), '字母主
 await p.evaluate(() => { __game.setMany({ autoMode: 'solver' }); __game.startAuto(); });
 lr = null; for (let s2 = 0; s2 < 40; s2++) { lr = await advance(p, 1); if (lr.win != null) break; }
 ok(lr.win != null, `字母主题：求解模式自动通关 ${lr.t.toFixed(1)} 秒`);
-await p.evaluate(() => { __game.setMany({ autoMode: 'ref', whiteModel: true }); __game.aeStart(); __game.startAuto(); }); await advance(p, 9); await p.evaluate(() => __game.aeStop());
+await p.evaluate(() => { __game.setMany({ autoMode: 'ref', whiteModel: true }); __game.startAuto(); __game.aeStart(); }); await advance(p, 9); await p.evaluate(() => __game.aeStop());
 await grab(() => __game.doExportAE(), '字母主题 AE 导出（白模）');
 const h5L = await grab(() => __game.doExportH5(), '字母主题 H5 导出（白模）');
 await grab(() => __game.doExport3D(), '字母主题 3D 导出（白模）');
