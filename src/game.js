@@ -51,7 +51,7 @@ export function snapLetterClips(L) {
 // 方向随机；要求可解、开局被卡住的字母 ≥ 一半、含 C/G 时 C 必须被扣住（需要转动脱扣），否则换种子重试
 export function wordLevel(word, seed = 1, S = {}) {
   const w = (String(word || 'CAKE').toUpperCase().replace(/[^A-Z]/g, '') || 'CAKE').slice(0, 8), n = w.length, H = 140;
-  const cols = n <= 4 ? n : Math.ceil(n / 2), rows = n <= 4 ? 1 : 2, sx = n <= 4 ? 150 : 150, sy = 210;
+  const cols = n <= 4 ? n : Math.ceil(n / 2), rows = n <= 4 ? 1 : 2, sx = cols > 1 ? Math.min(175, 580 / (cols - 1)) : 0, sy = 240;
   const pal = ['yellow', 'pink', 'teal', 'orange', 'purple', 'blue', 'green', 'red'];
   for (let tr = 0; tr < 400; tr++) {
     let r = (seed * 7919 + tr * 104729) % 2147483647 || 1; const rnd = () => (r = r * 16807 % 2147483647) / 2147483647;
