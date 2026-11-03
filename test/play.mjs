@@ -59,6 +59,7 @@ for (const [w, n] of [['LUNCH', 5], ['CAKE', 4]]) {
   ok(lr.win != null && lr.left === 0 && await p.evaluate(() => __game.G.rings.every(r => r.slot != null)), `字母主题 ${w}：参考序列自动通关（转 C 脱扣），用时 ${lr.t.toFixed(1)} 秒，全部入槽`);
 }
 ok(await p.evaluate(() => __game.L.clips.every(c => { const o = __game.L.rings[c.o]; return c.rx != null && Math.hypot(c.rx - o.x, c.ry - o.y) < 120; })), '字母主题：每根杆端都接在主人字母上（无悬空杆）');
+for (const w of ['MONEY', 'QUIZ', 'BRIGHTS', 'JAVELIN', 'ABCDEFGH']) { const is = await p.evaluate(w => { const L = __game.wordLevel(w, 4); return __game.layoutIssues(L); }, w); ok(is.total === 0, `字母主题：${w} 生成布局整洁（重叠 ${is.overlap} / 杆穿字 ${is.rodHit} / 杆交叉 ${is.cross}）`); }
 for (const w of ['MONEY', 'QUIZ', 'BRIGHTS', 'JAVELIN', 'SKY']) {
   await p.evaluate(w => { __game.setMany({ word: w, wordSeed: 3, autoMode: 'solver' }); __game.startAuto(); }, w);
   let lr = null; for (let s2 = 0; s2 < 60; s2++) { lr = await advance(p, 1); if (lr.win != null) break; }

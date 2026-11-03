@@ -1,6 +1,6 @@
 // 解环核玩工具 —— 主程序：游戏循环 / 3D 渲染合成 / 输入（按住拖动环）/ 自动通关（参考序列 + 求解）/ 关卡编辑器 / 录制 / AE·3D·H5 导出 / 设置面板
 import { GROUPS, DEFS, loadSettings, saveSettings, migrate, exportJSON, APP_ID, APP_VERSION } from './settings.js';
-import { Game, layoutIssues, levelKey, LETTER_LEVEL, levelFromSettings, solveLevel, normalizeLevel, randomLevel, REF_LEVEL, COLORS, COLOR_ZH, circleX } from './game.js';
+import { Game, wordLevel, layoutIssues, levelKey, LETTER_LEVEL, levelFromSettings, solveLevel, normalizeLevel, randomLevel, REF_LEVEL, COLORS, COLOR_ZH, circleX } from './game.js';
 import { Scene3D, colorOf } from './scene3d.js';
 import { glyphPolys, glyphNearest, segGlyphDist } from './glyphs.js';
 import { Sfx } from './audio.js';
@@ -454,7 +454,7 @@ window.__game = {
   get G() { return G; }, get S() { return S; }, get L() { return L; }, get view() { return view; }, get hand() { return hand; }, get auto() { return auto; }, get editor() { return editor; },
   autoSolve, startAuto, stopAuto, newGame, pressDesign, solveLevel, levelFromSettings, xfs,
   set(k, v) { S[k] = v; applyChange(k); buildPanel(); }, setMany(o) { Object.assign(S, o); saveSettings(S); buildPanel(); loadHand(); newGame(); },
-  openEditor, closeEditor, editorDown, editorMove, editorUp, levelCheck, levelRef, doRandom, get editLevel() { return editor && editor.lv; }, setEditorTool(t) { editor.tool = t; },
+  wordLevel, layoutIssues, openEditor, closeEditor, editorDown, editorMove, editorUp, levelCheck, levelRef, doRandom, get editLevel() { return editor && editor.lv; }, setEditorTool(t) { editor.tool = t; },
   doExportAE, doExport3D, doExportH5, aeStart: () => recStart(), aeStop: () => aeStop(), aeActive: () => aeActive(), startRec, stopRec, get mediaRec() { return rec; }, migrate, APP_ID, APP_VERSION,
 };
 buildPanel(); loadHand(); newGame(); window.__ready = true; requestAnimationFrame(loop);

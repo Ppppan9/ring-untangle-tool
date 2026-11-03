@@ -1,4 +1,4 @@
-# 解环核玩工具（Ring Untangle Tool）v1.8.0
+# 解环核玩工具（Ring Untangle Tool）v1.9.0
 
 根据参考广告视频复刻的「解环」核心玩法工具：three.js 渲染彩色金属光泽 C 形环与套环卡扣，单文件离线版 `index.html`。
 
