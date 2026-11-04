@@ -12,3 +12,7 @@ export async function openPage(url = URL0, vp = { width: 1300, height: 1000 }) {
 export async function advance(p, secs, fps = 30) { return p.evaluate(async ([n, dt]) => { for (let i = 0; i < n; i++) { window.__T += dt; __game.renderAt(window.__T); } const G = __game.G; return { t: G.t, left: G.left(), win: G.winT }; }, [Math.round(secs * fps), 1000 / fps]); }
 export async function shot(p, file) { const u = await p.evaluate(() => document.getElementById('stage').toDataURL('image/png')); fs.mkdirSync('screenshots', { recursive: true }); fs.writeFileSync(file, Buffer.from(u.split(',')[1], 'base64')); }
 export const ok = (c, m) => { if (!c) { console.error('FAIL:', m); process.exitCode = 1; } else console.log('ok -', m); };
+// 测试提速：低画质渲染（不影响玩法逻辑）+ 单项超时（防止挂起）
+export async function fastSim(p) { await p.evaluate(() => __game.setMany({ ssaa: 1, meshQuality: 0.4 })); }
+export function withTimeout(pr, ms, label) { let t; return Promise.race([pr.finally(() => clearTimeout(t)), new Promise((_, rej) => { t = setTimeout(() => rej(new Error(`TIMEOUT ${ms / 1000}s: ${label}`)), ms); })]); }
+export async function runUntilWin(p, maxSec, fps = 10) { let lr; for (let s = 0; s < maxSec; s++) { lr = await advance(p, 1, fps); if (lr.win != null) break; } return lr; }
