@@ -197,7 +197,7 @@ export class Game {
   press(i, x, y) {
     const r = this.rings[i]; if (!r || r.state !== 'idle') return null;
     const free = this.isFree(i), gr = this.grips(i);
-    if (this.lt) { r.px = this.L.rings[i].x; r.py = this.L.rings[i].y; } else if ((this.S.pivotMode || 'center') === 'center') { const c = this.centroid(); r.px = c[0]; r.py = c[1]; } else if (free && gr.length) { r.px = gr.reduce((s, c) => s + c.x, 0) / gr.length; r.py = gr.reduce((s, c) => s + c.y, 0) / gr.length; } else { r.px = this.L.rings[i].x; r.py = this.L.rings[i].y; }
+    if (this.lt) { r.px = this.L.rings[i].x; r.py = this.L.rings[i].y; } else if (this.pivotM() === 'centroid') { r.px = this.L.rings[i].x; r.py = this.L.rings[i].y; } else if (this.pivotM() === 'center') { const c = this.centroid(); r.px = c[0]; r.py = c[1]; } // 默认：绕环自身重心（几何中心）旋转 else if (free && gr.length) { r.px = gr.reduce((s, c) => s + c.x, 0) / gr.length; r.py = gr.reduce((s, c) => s + c.y, 0) / gr.length; } else { r.px = this.L.rings[i].x; r.py = this.L.rings[i].y; }
     r.shake = null; this.drag = { i, free, a0: Math.atan2(y - r.py, x - r.px), x0: x, y0: y, moved: 0, base: r.rot, cum: 0, last: Math.atan2(y - r.py, x - r.px), rel: 0 };
     this.events.push({ type: 'grab', i }); return this.drag;
   }
@@ -213,7 +213,7 @@ export class Game {
       if (spin) this.L.clips.forEach((c, k) => { if (c.g !== D.i || c.rel || this.gone()[c.o]) return; if (!/[CG]/.test(b.ch)) { if (Math.abs(D.cum) * 180 / Math.PI >= 330) { c.rel = true; D.rel++; this.events.push({ type: 'release', k }); } return; } const phi = Math.atan2(c.y - b.y, c.x - b.x) * 180 / Math.PI, gd = (b.rot || 0) + r.rot; let df = ((phi - gd) % 360 + 540) % 360 - 180; if (Math.abs(df) < this.S.releaseDeg) { c.rel = true; D.rel++; this.events.push({ type: 'release', k }); } });
       return;
     }
-    if ((this.S.pivotMode || 'center') === 'center') { // 绕谜题中心旋转：可取下的环可连续转动，被扣住的只能小幅晃动
+    if (this.pivotM() !== 'clip') { // 绕自身重心（默认）/谜题中心旋转：可取下的环可连续转动，被扣住的只能小幅晃动
       const an = Math.atan2(y - r.py, x - r.px); let d = an - D.last; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; D.last = an; D.cum += d;
       r.rot = D.free ? D.cum * 180 / Math.PI : clamp(D.cum * 180 / Math.PI * this.S.dragFollow, -this.S.blockMaxDeg, this.S.blockMaxDeg); if (D.free) { const st = Math.max(1, Math.ceil(Math.abs(d) * 180 / Math.PI / 5)); for (let k = st; k >= 1; k--) this.markPassed(D.i, r.rot - d * 180 / Math.PI * (k - 1) / st, D); } return; }
     const mx = D.free ? this.S.dragMaxDeg : this.S.blockMaxDeg; r.rot = clamp(da * 180 / Math.PI * this.S.dragFollow, -mx, mx);
@@ -238,8 +238,9 @@ export class Game {
     this.events.push({ type: 'block', i: D.i }); return { ok: false, i: D.i };
   }
   ringNeed(i) { const b = this.L.rings[i], gr = this.grips(i); if (!gr.length) return (this.S.exitDeg ?? 24) + 6; const a = gr.map(c => ((Math.atan2(c.y - b.y, c.x - b.x) * 180 / Math.PI - (b.gap ?? 90)) % 360 + 360) % 360), pos = Math.max(...a), neg = Math.min(...a) - 360; return pos <= -neg ? pos + 4 : neg - 4; } // 缺口依次滑过所有扣子所需转角
-  ringAligned(i, rot) { const gr = this.grips(i); if ((this.S.pivotMode || 'center') !== 'center') return !gr.length || Math.abs(rot) >= (this.S.exitDeg ?? 24); if (!gr.length) return Math.abs(rot) >= (this.S.exitDeg ?? 24); const P = (this.drag && this.drag.passed) || this._passed || new Set(); return gr.every(c => P.has(c)); }
+  ringAligned(i, rot) { const gr = this.grips(i); if (this.pivotM() === 'clip') return !gr.length || Math.abs(rot) >= (this.S.exitDeg ?? 24); if (!gr.length) return Math.abs(rot) >= (this.S.exitDeg ?? 24); const P = (this.drag && this.drag.passed) || this._passed || new Set(); return gr.every(c => P.has(c)); }
   markPassed(i, rot, D) { const b = this.L.rings[i], tol = this.S.exitTol ?? 25; D.passed = D.passed || new Set(); for (const c of this.grips(i)) if (Math.abs(wrap180(Math.atan2(c.y - b.y, c.x - b.x) * 180 / Math.PI - ((b.gap ?? 90) + rot))) <= tol) D.passed.add(c); }
+  pivotM() { const m = this.S.pivotMode; return m === 'center' || m === 'clip' ? m : 'centroid'; }
   centroid() { const a = this.L.rings; return [a.reduce((s, r) => s + r.x, 0) / a.length, a.reduce((s, r) => s + r.y, 0) / a.length]; }
   update(dt) {
     this.t += dt;

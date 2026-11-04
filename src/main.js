@@ -113,7 +113,7 @@ function directorStep(h) {
       G.press(P.i, hand.x, hand.y); P.pressed = true; P.t1 = tau; hand.follow = 1; if (S.pressEnabled) hand.pressT0 = G.t;
       const r = G.rings[P.i]; P.piv = [r.px, r.py]; P.a0 = Math.atan2(hand.y - r.py, hand.x - r.px); P.rr = Math.hypot(hand.x - r.px, hand.y - r.py);
       if (LT() && P.lin) { const [ux, uy] = G.slideDir(P.i); P.lin = [ux, uy, (S.slideNeed ?? 40) + 35]; }
-      P.sweep = !LT() && G.drag.free && (S.pivotMode || 'center') === 'center' && !P.blocked ? G.ringNeed(P.i) * Math.PI / 180 * (G.grips(P.i).length ? 1 : P.dir) : P.sw != null ? P.sw * Math.PI / 180 * P.dir : (G.drag.free ? S.dragMaxDeg : S.blockMaxDeg * 2.2) / Math.max(0.05, S.dragFollow) * Math.PI / 180 * P.dir;
+      P.sweep = !LT() && G.drag.free && S.pivotMode !== 'clip' && !P.blocked ? G.ringNeed(P.i) * Math.PI / 180 * (G.grips(P.i).length ? 1 : P.dir) : P.sw != null ? P.sw * Math.PI / 180 * P.dir : (G.drag.free ? S.dragMaxDeg : S.blockMaxDeg * 2.2) / Math.max(0.05, S.dragFollow) * Math.PI / 180 * P.dir;
     }
     return;
   }
