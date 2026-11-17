@@ -46,6 +46,7 @@ function newGame(lv = null) {
   { const h0 = LT() ? LETTER_HAND0 : REF_HAND0; hand.x = h0.x; hand.y = h0.y; } window.__finished = false; finishStopT = null;
   const sv = solveLevel(level, S.gripLimit); G.solvable = sv.solvable;
   status(`v${APP_VERSION} · ${level.name || '自定义关卡'} · ${level.rings.length} 个环 · ${level.clips.length} 个扣 · ${sv.solvable ? '可全部解开' : `⚠ 不可解（${sv.stuck.length} 个环卡死）`}`);
+  try { S3.build(L, geoS()); makeAssets(); } catch (e) { _aeAssets = null; _aeAssetsKey = ''; }
 }
 const ended = () => !!(G && G.winT != null);
 
