@@ -10,6 +10,11 @@ export function createAERecorder(api) {
   function stop() { const r = R; R = null; return r; }
   function sample(now) {
     if (!R) return; const E = api.env(); if (E.L !== R.L) { R = null; return; }
+    // If the clock jumps (tests set __vclock after 开始记录, or now() switches from wall to virtual),
+    // rebase t0 so lastT stays the real content length. Otherwise D becomes hundreds of seconds and export hangs.
+    const elapsedMs = now - R.t0, expectedMs = R.lastT * 1000;
+    if (R.frames === 0 && elapsedMs > 2000) R.t0 = now;
+    else if (R.frames > 0 && Math.abs(elapsedMs - expectedMs) > 2000) R.t0 = now - expectedMs;
     const t = Math.max(R.lastT + 1e-4 * (R.frames > 0), (now - R.t0) / 1000), f = R.frames;
     for (const it of E.items) { let tr = R.tracks.get(it.id); if (!tr) { tr = { id: it.id, asset: it.asset, z: it.z, s: [] }; R.tracks.set(it.id, tr); } tr.s.push([t, r3(it.x), r3(it.y), r3(it.sc), r3(it.rot), r3(it.op), f]); }
     R.lastT = t; R.frames++;
@@ -18,12 +23,19 @@ export function createAERecorder(api) {
     if (!rec || rec.frames < 2) throw new Error('没有可导出的记录：请先自动通关或手动游玩');
     const E = api.env(), S = So ? { ...rec.S, ...So } : rec.S, fps = +S.aeFps || 30, bake = S.aeSampling === 'bake', zh = S.aeNames !== 'en';
     const CW = E.canvas.width, CH = E.canvas.height, A = api.assets(rec);
-    const D = Math.max(1 / fps, Math.ceil((rec.lastT + 1 / fps) * fps - 1e-6) / fps);
+    let tMin = Infinity, tMax = 0;
+    for (const tr of rec.tracks.values()) for (const e of tr.s) { if (e[0] < tMin) tMin = e[0]; if (e[0] > tMax) tMax = e[0]; }
+    if (!isFinite(tMin)) { tMin = 0; tMax = rec.lastT || 0; }
+    const content = Math.max(0, tMax - tMin);
+    const shift = (tMin > 1 && tMin > content * 0.5) ? tMin : 0;
+    const useLast = Math.min(180, Math.max(rec.lastT || 0, tMax) - shift);
+    const D = Math.max(1 / fps, Math.ceil((useLast + 1 / fps) * fps - 1e-6) / fps);
+    const tx = t => Math.max(0, t - shift);
     const assets = [], files = [], pending = [], used = new Set();
     const toPng = c => new Promise(res => c.toBlob(b => b.arrayBuffer().then(a => res(new Uint8Array(a))), 'image/png'));
     const folders = [{ id: 'root', name: zh ? '解环_AE工程' : 'RingUntangle_AE' }, { id: 'img', name: zh ? '素材' : 'Assets', parent: 'root' }, { id: 'rings', name: zh ? '环' : 'Rings', parent: 'img' }, { id: 'ui', name: zh ? '界面' : 'UI', parent: 'img' }, { id: 'aud', name: zh ? '音频' : 'Audio', parent: 'root' }, { id: 'pre', name: zh ? '预合成' : 'Precomps', parent: 'root' }];
     const asset = id => { const a = A[id]; if (!used.has(id)) { used.add(id); const file = 'assets/' + id + '.png'; assets.push({ id, file, folder: id.startsWith('ring') ? 'rings' : 'ui', w: a.c.width, h: a.c.height, name: id + '.png' }); pending.push(toPng(a.c).then(data => files.push({ name: file, data }))); } return a; };
-    function resample(s) { const f0 = Math.round(s[0][0] * fps), f1 = Math.max(f0, Math.round(s[s.length - 1][0] * fps)), out = []; let j = 0; for (let f = f0; f <= f1; f++) { const tau = f / fps; while (j < s.length - 2 && s[j + 1][0] <= tau + 1e-9) j++; const a = s[j], b = s[j + 1] || a, u = b[0] > a[0] ? Math.min(1, Math.max(0, (tau - a[0]) / (b[0] - a[0]))) : 0; out.push({ t: tau, v: a.map((x, i) => i === 0 ? tau : x + (b[i] - x) * u) }); } return { f0, f1, list: out }; }
+    function resample(s) { const s0 = s.map(e => { const c = e.slice(); c[0] = tx(e[0]); return c; }); const f0 = Math.round(s0[0][0] * fps), f1 = Math.max(f0, Math.round(s0[s0.length - 1][0] * fps)); const out = []; let j = 0; for (let f = f0; f <= f1; f++) { const tau = f / fps; while (j < s0.length - 2 && s0[j + 1][0] <= tau + 1e-9) j++; const a = s0[j], b = s0[j + 1] || a, u = b[0] > a[0] ? Math.min(1, Math.max(0, (tau - a[0]) / (b[0] - a[0]))) : 0; out.push({ t: tau, v: a.map((x, i) => i === 0 ? tau : x + (b[i] - x) * u) }); } return { f0, f1, list: out }; }
     function prop(fr, get, tol) {
       const t = fr.list.map(o => o.t), vv = fr.list.map(o => get(o.v)), same = (a, b, e) => Array.isArray(a) ? a.every((x, i) => Math.abs(x - b[i]) <= e) : Math.abs(a - b) <= e;
       if (vv.every(x => same(x, vv[0], 1e-6))) return rnd(vv[0]);
@@ -37,7 +49,7 @@ export function createAERecorder(api) {
       // 拆成连续出现段
       let a0 = 0; const segs = []; for (let i = 1; i <= tr.s.length; i++) if (i === tr.s.length || tr.s[i][6] !== tr.s[i - 1][6] + 1) { segs.push(tr.s.slice(a0, i)); a0 = i; }
       segs.forEach((s, n) => { if (!A[tr.asset]) return; // 主题/关卡切换后旧轨道无素材：跳过
-        const a = asset(tr.asset), fr = resample(s), tin = fr.f0 / fps, last = s[s.length - 1], tout = Math.min(D, Math.max(tin + 1 / fps, Math.round((rec.frames - 1 > last[6] ? last[0] + 1 / fps : D) * fps) / fps));
+        const a = asset(tr.asset), fr = resample(s), tin = fr.f0 / fps, last = s[s.length - 1], tout = Math.min(D, Math.max(tin + 1 / fps, Math.round((rec.frames - 1 > last[6] ? tx(last[0]) + 1 / fps : D) * fps) / fps));
         layers.push({ name: api.layerName(tr.id, zh) + (segs.length > 1 ? ` #${n + 1}` : ''), src: { asset: tr.asset }, in: r4(tin), out: r4(tout), label: tr.id.startsWith('ring') ? 9 : tr.id === 'hand' ? 12 : 5, tr: {
           anchor: rnd([a.ax, a.ay]), position: prop(fr, e => [e[1], e[2]], 0.25), scale: prop(fr, e => [e[3] * 100 * (a.k || 1), e[3] * 100 * (a.k || 1)], 0.25), rotation: prop(fr, e => e[4], 0.2), opacity: prop(fr, e => Math.max(0, Math.min(100, e[5] * 100)), 0.5) } });
       });
@@ -48,17 +60,17 @@ export function createAERecorder(api) {
     const audioFiles = [], ZH = n => (SFX_NAMES[n] || [0, n])[1];
     if (S.aeAudio !== 'none' && rec.sfx.length) {
       try {
-        if (S.aeAudio === 'both' || S.aeAudio === 'mixed') { const buf = await renderSfxOffline(rec.sfx, D, S); if (buf) { audioFiles.push({ name: 'audio/mix.wav', data: encodeWav(buf) }); assets.push({ id: 'mix', file: 'audio/mix.wav', folder: 'aud', name: 'mix.wav' }); layers.push({ name: zh ? '混合音轨' : 'Mixed audio', src: { asset: 'mix' }, label: 16 }); } }
+        if (S.aeAudio === 'both' || S.aeAudio === 'mixed') { const buf = await renderSfxOffline(rec.sfx.map(e => ({ ...e, t: tx(e.t) })), D, S); if (buf) { audioFiles.push({ name: 'audio/mix.wav', data: encodeWav(buf) }); assets.push({ id: 'mix', file: 'audio/mix.wav', folder: 'aud', name: 'mix.wav' }); layers.push({ name: zh ? '混合音轨' : 'Mixed audio', src: { asset: 'mix' }, label: 16 }); } }
         if (S.aeAudio === 'both' || S.aeAudio === 'events') {
           const kinds = [...new Set(rec.sfx.map(e => e.name))];
           for (const k of kinds) { const buf = await renderSfxOffline([{ t: 0, name: k }], (SFX_DUR[k] || 0.4) + 0.2, S); if (!buf) continue; audioFiles.push({ name: `audio/sfx_${k}.wav`, data: encodeWav(buf) }); assets.push({ id: 'sfx_' + k, file: `audio/sfx_${k}.wav`, folder: 'aud', name: `sfx_${k}.wav` }); }
-          const al = rec.sfx.map((e, i) => { const st = r4(e.t); return { name: (zh ? '音效 ' : 'SFX ') + (i + 1) + ' ' + (zh ? ZH(e.name) : e.name), src: { asset: 'sfx_' + e.name }, start: st, in: st, label: 16 }; });
+          const al = rec.sfx.map((e, i) => { const st = r4(tx(e.t)); return { name: (zh ? '音效 ' : 'SFX ') + (i + 1) + ' ' + (zh ? ZH(e.name) : e.name), src: { asset: 'sfx_' + e.name }, start: st, in: st, label: 16 }; });
           comps.push({ id: 'sfx', name: zh ? '音效_逐事件' : 'SFX events', w: CW, h: CH, duration: D, fps, folder: 'pre', layers: al });
           layers.push({ name: zh ? '音效_逐事件' : 'SFX events', src: { comp: 'sfx' }, label: 16 });
         }
       } catch (e) { console.warn('audio export', e); }
     }
-    for (const e of rec.sfx) markers.push([r4(e.t), zh ? ZH(e.name) : e.name]);
+    for (const e of rec.sfx) markers.push([r4(tx(e.t)), zh ? ZH(e.name) : e.name]);
     const d = new Date(), p2 = x => String(x).padStart(2, '0'), stamp = `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}_${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`;
     comps.push({ id: 'main', name: zh ? '主合成_解环' : 'Main_RingUntangle', w: CW, h: CH, duration: D, fps, folder: 'root', bg: [0, 0, 0], layers, markers });
     // AE 合成尺寸

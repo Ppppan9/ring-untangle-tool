@@ -155,15 +155,16 @@ const _tmp = {}; const tmpC = (k, w, h) => { let c = _tmp[k]; if (!c) c = _tmp[k
 let grainTile = null;
 function drawGrain(g, W, H) { if (S.grain <= 0) return; if (!grainTile) { grainTile = document.createElement('canvas'); grainTile.width = grainTile.height = 256; const gg = grainTile.getContext('2d'), d = gg.createImageData(256, 256); let r = 99; for (let i = 0; i < d.data.length; i += 4) { r = (r * 16807) % 2147483647; const v = 128 + ((r / 2147483647) - 0.5) * 255; d.data[i] = d.data[i + 1] = d.data[i + 2] = v; d.data[i + 3] = 255; } gg.putImageData(d, 0, 0); }
   g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = S.grain; g.globalCompositeOperation = 'overlay'; g.fillStyle = g.createPattern(grainTile, 'repeat'); g.fillRect(0, 0, W, H); g.restore(); }
-function drawRings(g, only = -1, X = null) {
-  S3.build(L, geoS()); const c3 = S3.render(S, view, X || xfs(), flashes(), only), W = cv.width, H = cv.height;
+function drawRings(g, only = -1, X = null, opt = {}) {
+  if (!opt.noBuild) S3.build(L, geoS());
+  const c3 = S3.render(S, view, X || xfs(), flashes(), only), W = cv.width, H = cv.height;
   // 暖色剪影（投影 / 接触 AO 共用）
   const sil = tmpC('sil', W, H), sg = sil.getContext('2d'); sg.imageSmoothingQuality = 'high'; g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; sg.globalCompositeOperation = 'copy'; sg.drawImage(c3, 0, 0, W, H); sg.globalCompositeOperation = 'source-in'; sg.fillStyle = S.shadowColor; sg.fillRect(0, 0, W, H); sg.globalCompositeOperation = 'source-over';
   const CY = LT() && S.letterStyle === 'candy', SH = CY ? { a: S.candyShA, b: S.candyShBlur, dx: S.candyShDX, dy: S.candyShDY } : { a: S.shadowAlpha, b: S.shadowBlur, dx: S.shadowDX, dy: S.shadowDY };
   if (SH.a > 0) { g.save(); g.globalAlpha = SH.a; g.filter = `blur(${SH.b * K}px)`; g.drawImage(sil, SH.dx * K, SH.dy * K); g.restore(); }
   if (CY && S.candyContact > 0) { g.save(); g.globalAlpha = S.candyContact; g.filter = `blur(${2 * K}px)`; g.drawImage(sil, 2 * K, 3 * K); g.restore(); }
   if (S.aoAmount > 0) { g.save(); g.globalAlpha = S.aoAmount; g.filter = `blur(${S.aoBlur * K}px)`; g.drawImage(sil, 0, S.aoBlur * K * 0.4); g.restore(); }
-  if (S.depthBlur > 0 && !CY) { // 糖果：参考无景深，关闭（否则顶部 A 偏灰偏绿） // 上方景深：上半部分用模糊版，向下渐变到清晰
+  if (S.depthBlur > 0 && !CY && !opt.noDepthBlur) { // 糖果：参考无景深，关闭（否则顶部 A 偏灰偏绿） // 上方景深：上半部分用模糊版，向下渐变到清晰
     const bl = tmpC('bl', W, H), bg2 = bl.getContext('2d'); bg2.globalCompositeOperation = 'copy'; bg2.filter = `blur(${S.depthBlur * K}px)`; bg2.drawImage(c3, 0, 0, W, H); bg2.filter = 'none';
     const y1 = (S.depthBlurY - view.y0) * K, gr = bg2.createLinearGradient(0, 0, 0, Math.max(1, y1)); gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(0.55, 'rgba(0,0,0,0.85)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
     const sh = tmpC('sh', W, H), shg = sh.getContext('2d'); shg.globalCompositeOperation = 'copy'; shg.drawImage(c3, 0, 0, W, H); shg.globalCompositeOperation = 'destination-out'; shg.fillStyle = gr; shg.fillRect(0, 0, W, Math.max(1, y1)); shg.globalCompositeOperation = 'source-over';
@@ -347,10 +348,11 @@ function makeAssets() {
   { const c = mk(cv.width, cv.height), g = c.getContext('2d'), sv = ctx; void sv; const gr = g.createLinearGradient(0, 0, 0, c.height); gr.addColorStop(0, S.bgTop); gr.addColorStop(1, S.bgBottom); g.fillStyle = gr; g.fillRect(0, 0, c.width, c.height); drawGrain(g, c.width, c.height); A.background = { c, ax: 0, ay: 0 }; }
   if (S.titleShow) { const c = mk(cv.width, cv.height), g = c.getContext('2d'); g.setTransform(K, 0, 0, K, -view.x0 * K, -view.y0 * K); g.fillStyle = S.titleBar; g.fillRect(view.x0 - 2, S.titleY, view.w + 4, S.titleH); g.fillStyle = S.titleColor; g.font = `900 ${S.titleSize}px "Arial Black","Noto Sans CJK SC",sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.translate(DW / 2, S.titleY + S.titleH / 2 + S.titleSize * 0.04 + (S.titleDY || 0)); g.scale(S.titleSX || 1, 1); g.fillText(S.titleText, 0, 0); A.title = { c, ax: 0, ay: 0 }; }
   const rest = L.rings.map(r => ({ x: r.x, y: r.y, rot: 0, sc: 1, op: 1 })), Rm = (S.ringR + S.tubeR) * bs();
+  S3.build(L, geoS());
   L.rings.forEach((r, i) => {
     let ext = Rm; L.clips.forEach(c => { if (c.o === i) ext = Math.max(ext, Math.hypot(c.x - r.x, c.y - r.y) + S.clipSize * bs()); });
     ext += S.shadowBlur * 2 + Math.max(Math.abs(S.shadowDX), Math.abs(S.shadowDY)) + 6;
-    const full = mk(cv.width, cv.height), fg = full.getContext('2d'); drawRings(fg, i, rest);
+    const full = mk(cv.width, cv.height), fg = full.getContext('2d'); drawRings(fg, i, rest, { noBuild: true, noDepthBlur: true });
     const cx = (r.x - view.x0) * K, cy = (r.y - view.y0) * K, e = ext * K, c = mk(2 * e, 2 * e); c.getContext('2d').drawImage(full, cx - e, cy - e, 2 * e, 2 * e, 0, 0, 2 * e, 2 * e);
     A['ring_' + i] = { c, ax: e, ay: e };
   });
