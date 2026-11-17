@@ -2,6 +2,7 @@
 import { GROUPS, DEFS, loadSettings, saveSettings, migrate, exportJSON, APP_ID, APP_VERSION } from './settings.js';
 import { Game, ROTG, slotP, wordLevel, layoutIssues, levelKey, LETTER_LEVEL, levelFromSettings, solveLevel, normalizeLevel, randomLevel, REF_LEVEL, COLORS, COLOR_ZH, circleX } from './game.js';
 import { Scene3D, colorOf } from './scene3d.js';
+import { ueOptimizeExport } from './ue-optimize.js';
 import { glyphPolys, glyphPolysS, glyphNearest, segGlyphDist, LTUBE, LCONN } from './glyphs.js';
 import { Sfx } from './audio.js';
 import { REF_SEQ, REF_HAND0, LETTER_SEQS, LETTER_HAND0 } from './refseq.js';
@@ -445,9 +446,10 @@ async function doExport3D() {
   const clip = new THREE.AnimationClip('RingUntangle', -1, tracks);
   const cam = new THREE.OrthographicCamera(-DW / 2 * u, DW / 2 * u, DH / 2 * u, -DH / 2 * u, 0.1, 100); cam.name = 'Camera'; cam.position.set(DW / 2 * u, -DH / 2 * u, 20); scene.add(cam);
   mark('3d-tracks');
-  const glb = await new Promise((res, rej) => new GLTFExporter().parse(scene, res, rej, { binary: true, animations: [clip] }));
+  const glb0 = await new Promise((res, rej) => new GLTFExporter().parse(scene, res, rej, { binary: true, animations: [clip] }));
+  const UEO = ueOptimizeExport(glb0, S, { fps }), glb = UEO.glb; // 引擎精简导出（控制台可关）
   mark('3d-gltf');
-  const enc = new TextEncoder(), meta = { tool: APP_ID, format: 'export3d/1', fps, duration: r0.lastT, frames: Math.ceil(r0.lastT * fps), width: DW, height: DH, units: '1 px = 1 cm（Y 向上，场景在 XY 平面，相机沿 -Z 看）', nodes: nodes.map(n => n.name), level: { rings: L.rings, clips: L.clips }, note: '透明度淡出在 glTF 里用缩放→0 表示（glTF 不支持材质透明度动画）' };
+  const enc = new TextEncoder(), meta = { tool: APP_ID, format: 'export3d/1', fps, optimize: UEO.stats, duration: r0.lastT, frames: Math.ceil(r0.lastT * fps), width: DW, height: DH, units: '1 px = 1 cm（Y 向上，场景在 XY 平面，相机沿 -Z 看）', nodes: nodes.map(n => n.name), level: { rings: L.rings, clips: L.clips }, note: '透明度淡出在 glTF 里用缩放→0 表示（glTF 不支持材质透明度动画）' };
   const files = [{ name: 'scene.glb', data: new Uint8Array(glb) }, { name: 'scene3d.json', data: enc.encode(JSON.stringify(meta, null, 1)) }, { name: 'README_3D.md', data: enc.encode('# 解环 · 3D 动画导出\n\n- `scene.glb`：glTF 2.0（Blender / UE5 / C4D 直接导入），每个环一个节点（扣子是子网格），动画名 RingUntangle。\n- `scene3d.json`：帧率、时长、关卡数据。\n- 本版本仅导出 glTF（未生成 FBX / blender_import.py）。\n') }];
   const blob = makeZip(files), name = `ring-untangle-tool_3d_export_${stampNow()}.zip`; download(blob, name); window.__3dLast = { name, size: blob.size, tracks: tracks.length }; mark('3d-zip'); status(`3D 导出：${nodes.length} 个节点，${tracks.length} 条动画轨道`); return window.__3dLast;
 }

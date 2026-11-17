@@ -243,6 +243,7 @@ export const GROUPS = [
   ['导出 3D 动画（UE5 / C4D / Blender）', [
     ['_export3d', '导出 glTF（.glb，环/扣为独立节点 + 动画）', 'button', 'export3d', '导出 3D 动画 (glTF)'],
     ['export3dFps', '3D 动画帧率', 'select', '30', [['24', '24'], ['25', '25'], ['30', '30'], ['60', '60']]],
+    ['export3dLite', '引擎精简导出（合并重复模型和材质、复用短暂出现的物体、精简关键帧；导入 3D 引擎更快、不易卡死）', 'bool', true],
   ]],
   ['导出 H5 试玩广告', [
     ['_exportH5', '导出当前设置为自包含 H5 试玩（无编辑器面板，仅游戏+CTA）', 'button', 'exportH5', '⬇ 导出 H5 试玩 ZIP'],
