@@ -22,7 +22,9 @@ export function createAERecorder(api) {
   async function exportZip(rec = R, So = null) {
     if (!rec || rec.frames < 2) throw new Error('没有可导出的记录：请先自动通关或手动游玩');
     const E = api.env(), S = So ? { ...rec.S, ...So } : rec.S, fps = +S.aeFps || 30, bake = S.aeSampling === 'bake', zh = S.aeNames !== 'en';
+    const tEx = performance.now(), mark = k => { const w = typeof window !== 'undefined' ? window : {}; (w.__aeProf || (w.__aeProf = [])).push([k, +(performance.now() - tEx).toFixed(1)]); };
     const CW = E.canvas.width, CH = E.canvas.height, A = api.assets(rec);
+    mark('export-assets');
     let tMin = Infinity, tMax = 0;
     for (const tr of rec.tracks.values()) for (const e of tr.s) { if (e[0] < tMin) tMin = e[0]; if (e[0] > tMax) tMax = e[0]; }
     if (!isFinite(tMin)) { tMin = 0; tMax = rec.lastT || 0; }
@@ -35,11 +37,31 @@ export function createAERecorder(api) {
     const toPng = c => new Promise(res => c.toBlob(b => b.arrayBuffer().then(a => res(new Uint8Array(a))), 'image/png'));
     const folders = [{ id: 'root', name: zh ? '解环_AE工程' : 'RingUntangle_AE' }, { id: 'img', name: zh ? '素材' : 'Assets', parent: 'root' }, { id: 'rings', name: zh ? '环' : 'Rings', parent: 'img' }, { id: 'ui', name: zh ? '界面' : 'UI', parent: 'img' }, { id: 'aud', name: zh ? '音频' : 'Audio', parent: 'root' }, { id: 'pre', name: zh ? '预合成' : 'Precomps', parent: 'root' }];
     const asset = id => { const a = A[id]; if (!used.has(id)) { used.add(id); const file = 'assets/' + id + '.png'; assets.push({ id, file, folder: id.startsWith('ring') ? 'rings' : 'ui', w: a.c.width, h: a.c.height, name: id + '.png' }); pending.push(toPng(a.c).then(data => files.push({ name: file, data }))); } return a; };
-    function resample(s) { const s0 = s.map(e => { const c = e.slice(); c[0] = tx(e[0]); return c; }); const f0 = Math.round(s0[0][0] * fps), f1 = Math.max(f0, Math.round(s0[s0.length - 1][0] * fps)); const out = []; let j = 0; for (let f = f0; f <= f1; f++) { const tau = f / fps; while (j < s0.length - 2 && s0[j + 1][0] <= tau + 1e-9) j++; const a = s0[j], b = s0[j + 1] || a, u = b[0] > a[0] ? Math.min(1, Math.max(0, (tau - a[0]) / (b[0] - a[0]))) : 0; out.push({ t: tau, v: a.map((x, i) => i === 0 ? tau : x + (b[i] - x) * u) }); } return { f0, f1, list: out }; }
+    function resample(s) {
+      const s0 = s.map(e => { const c = e.slice(); c[0] = Math.max(0, Math.min(D, tx(e[0]))); return c; });
+      const f0 = Math.max(0, Math.round(s0[0][0] * fps)), f1 = Math.max(f0, Math.min(Math.round(D * fps), Math.round(s0[s0.length - 1][0] * fps)));
+      const out = []; let j = 0;
+      for (let f = f0; f <= f1; f++) {
+        const tau = f / fps;
+        while (j < s0.length - 2 && s0[j + 1][0] <= tau + 1e-9) j++;
+        const a = s0[j], b = s0[j + 1] || a, u = b[0] > a[0] ? Math.min(1, Math.max(0, (tau - a[0]) / (b[0] - a[0]))) : 0;
+        out.push({ t: tau, v: a.map((x, i) => i === 0 ? tau : x + (b[i] - x) * u) });
+      }
+      return { f0, f1, list: out };
+    }
     function prop(fr, get, tol) {
       const t = fr.list.map(o => o.t), vv = fr.list.map(o => get(o.v)), same = (a, b, e) => Array.isArray(a) ? a.every((x, i) => Math.abs(x - b[i]) <= e) : Math.abs(a - b) <= e;
       if (vv.every(x => same(x, vv[0], 1e-6))) return rnd(vv[0]);
-      let keep; if (bake) keep = vv.map((_, i) => i); else { keep = [0]; let a = 0; for (let b = 2; b < vv.length; b++) { let ok = true; for (let m = a + 1; m < b && ok; m++) { const u = (t[m] - t[a]) / (t[b] - t[a]); const lin = Array.isArray(vv[a]) ? vv[a].map((x, i) => x + (vv[b][i] - x) * u) : vv[a] + (vv[b] - vv[a]) * u; ok = same(lin, vv[m], tol); } if (!ok) { keep.push(b - 1); a = b - 1; } } if (vv.length > 1) keep.push(vv.length - 1); }
+      let keep; if (bake) keep = vv.map((_, i) => i); else {
+        // O(n)：只检查被跳过的点相对「上一保留点 → 下一点」是否仍在容差内
+        keep = [0];
+        for (let b = 1; b < vv.length - 1; b++) {
+          const a = keep[keep.length - 1], c = b + 1, den = t[c] - t[a], u = den ? (t[b] - t[a]) / den : 0;
+          const lin = Array.isArray(vv[a]) ? vv[a].map((x, i) => x + (vv[c][i] - x) * u) : vv[a] + (vv[c] - vv[a]) * u;
+          if (!same(lin, vv[b], tol)) keep.push(b);
+        }
+        if (vv.length > 1) keep.push(vv.length - 1);
+      }
       return { t: keep.map(i => r4(t[i])), v: keep.map(i => rnd(vv[i])) };
     }
     const layers = [], markers = [], comps = [];
@@ -57,6 +79,7 @@ export function createAERecorder(api) {
     }
     // 标题条在环之上、手指之下
     { const hi = layers.findIndex(l => l.name === (zh ? '手指' : 'Hand')); if (A.title) { asset('title'); const L = { name: zh ? '标题条' : 'Title bar', src: { asset: 'title' }, label: 15, tr: { anchor: [0, 0], position: [0, 0], scale: [100, 100] } }; if (hi >= 0) layers.splice(hi, 0, L); else layers.push(L); } }
+    mark('export-resample');
     const audioFiles = [], ZH = n => (SFX_NAMES[n] || [0, n])[1];
     if (S.aeAudio !== 'none' && rec.sfx.length) {
       try {
@@ -79,10 +102,14 @@ export function createAERecorder(api) {
     const stats = { comps: comps.length, layers: 0, keys: 0, perComp: {}, rings: E.L.rings.length, sfx: rec.sfx.length };
     for (const c of comps) { stats.perComp[c.id] = c.layers.length; stats.layers += c.layers.length; for (const l of c.layers) if (l.tr) for (const k of ['position', 'scale', 'rotation', 'opacity']) { const p = l.tr[k]; if (p && p.t && p.t.length > 1) stats.keys += p.t.length; } }
     const timeline = { meta: { tool: 'ring-untangle-tool', format: 1, created: d.toISOString(), fps, width: CW2, height: CH2, duration: D, canvas: [CW, CH], scale: K, sampling: bake ? 'bake' : 'reduce', names: zh ? 'zh' : 'en', saveAep: S.aeSaveAep !== false, aepName: `ring-untangle-tool_${stamp}.aep`, newProject: true, stats, level: { rings: E.L.rings, clips: E.L.clips }, note: '图层从下到上排列；时间单位秒；位置/锚点单位像素（合成坐标）；缩放为百分比' }, folders, assets, comps, mainComp: 'main' };
+    mark('export-audio');
     await Promise.all(pending);
+    mark('export-png');
     const enc = new TextEncoder();
     const all = [{ name: 'build_ae_project.jsx', data: enc.encode(JSX_TEXT) }, { name: 'timeline.json', data: enc.encode(JSON.stringify(timeline)) }, { name: 'README_AE.md', data: enc.encode(README_TEXT) }, ...files.sort((a, b) => a.name < b.name ? -1 : 1), ...audioFiles];
-    return { blob: makeZip(all), name: `ring-untangle-tool_ae_export_${stamp}.zip`, timeline, stats, files: all.length, fileList: all.map(f => f.name) };
+    const blob = makeZip(all);
+    mark('export-zip');
+    return { blob, name: `ring-untangle-tool_ae_export_${stamp}.zip`, timeline, stats, files: all.length, fileList: all.map(f => f.name) };
   }
   return { start, stop, sample, exportZip, get rec() { return R; } };
 }

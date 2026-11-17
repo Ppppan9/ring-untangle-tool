@@ -344,20 +344,44 @@ function sceneItems() {
   return items;
 }
 function makeAssets() {
+  const t0 = performance.now(), prof = (window.__aeProf = window.__aeProf || []);
+  const mark = (k) => prof.push([k, +(performance.now() - t0).toFixed(1)]);
   const A = {}, mk = (w, h) => { const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w)); c.height = Math.max(1, Math.round(h)); return c; };
   { const c = mk(cv.width, cv.height), g = c.getContext('2d'), sv = ctx; void sv; const gr = g.createLinearGradient(0, 0, 0, c.height); gr.addColorStop(0, S.bgTop); gr.addColorStop(1, S.bgBottom); g.fillStyle = gr; g.fillRect(0, 0, c.width, c.height); drawGrain(g, c.width, c.height); A.background = { c, ax: 0, ay: 0 }; }
   if (S.titleShow) { const c = mk(cv.width, cv.height), g = c.getContext('2d'); g.setTransform(K, 0, 0, K, -view.x0 * K, -view.y0 * K); g.fillStyle = S.titleBar; g.fillRect(view.x0 - 2, S.titleY, view.w + 4, S.titleH); g.fillStyle = S.titleColor; g.font = `900 ${S.titleSize}px "Arial Black","Noto Sans CJK SC",sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.translate(DW / 2, S.titleY + S.titleH / 2 + S.titleSize * 0.04 + (S.titleDY || 0)); g.scale(S.titleSX || 1, 1); g.fillText(S.titleText, 0, 0); A.title = { c, ax: 0, ay: 0 }; }
+  mark('assets-ui');
   const rest = L.rings.map(r => ({ x: r.x, y: r.y, rot: 0, sc: 1, op: 1 })), Rm = (S.ringR + S.tubeR) * bs();
   S3.build(L, geoS());
+  mark('assets-build');
+  // 每个环只从 3D 画布裁剪包围盒再叠阴影，避免 11 次全画布 CSS blur（导出可达数分钟）
+  const ssaa = Math.max(1, S3.canvas.width / Math.max(1, cv.width));
+  const CY = LT() && S.letterStyle === 'candy';
+  const SH = CY ? { a: S.candyShA, b: S.candyShBlur, dx: S.candyShDX, dy: S.candyShDY } : { a: S.shadowAlpha, b: S.shadowBlur, dx: S.shadowDX, dy: S.shadowDY };
   L.rings.forEach((r, i) => {
+    const tR = performance.now();
     let ext = Rm; L.clips.forEach(c => { if (c.o === i) ext = Math.max(ext, Math.hypot(c.x - r.x, c.y - r.y) + S.clipSize * bs()); });
     ext += S.shadowBlur * 2 + Math.max(Math.abs(S.shadowDX), Math.abs(S.shadowDY)) + 6;
-    const full = mk(cv.width, cv.height), fg = full.getContext('2d'); drawRings(fg, i, rest, { noBuild: true, noDepthBlur: true });
-    const cx = (r.x - view.x0) * K, cy = (r.y - view.y0) * K, e = ext * K, c = mk(2 * e, 2 * e); c.getContext('2d').drawImage(full, cx - e, cy - e, 2 * e, 2 * e, 0, 0, 2 * e, 2 * e);
+    const c3 = S3.render(S, view, rest, flashes(), i);
+    const e = ext * K, w = Math.max(1, Math.round(2 * e)), h = w;
+    const sx = (r.x - view.x0) * K * ssaa - e * ssaa, sy = (r.y - view.y0) * K * ssaa - e * ssaa, sw = 2 * e * ssaa, sh = sw;
+    const c = mk(w, h), g = c.getContext('2d');
+    g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+    if (SH.a > 0) {
+      const sil = mk(w, h), sg = sil.getContext('2d');
+      sg.drawImage(c3, sx, sy, sw, sh, 0, 0, w, h);
+      sg.globalCompositeOperation = 'source-in';
+      sg.fillStyle = S.shadowColor; sg.fillRect(0, 0, w, h);
+      g.save(); g.globalAlpha = SH.a; g.filter = `blur(${Math.max(0, SH.b * K)}px)`;
+      g.drawImage(sil, SH.dx * K, SH.dy * K); g.restore();
+    }
+    g.drawImage(c3, sx, sy, sw, sh, 0, 0, w, h);
     A['ring_' + i] = { c, ax: e, ay: e };
+    prof.push(['assets-ring-' + i, +(performance.now() - tR).toFixed(1)]);
   });
+  mark('assets-rings');
   if (hand.img) { const s = handScaleOf() * K, w = hand.img.width * s, h = hand.img.height * s, c = mk(w, h), g = c.getContext('2d'); if (S.handFlip) { g.translate(w, 0); g.scale(-1, 1); } g.drawImage(hand.img, 0, 0, w, h); A.hand = { c, ax: S.handFlip ? (1 - S.handAnchorX) * w : S.handAnchorX * w, ay: S.handAnchorY * h }; }
   { const c = mk(cv.width, cv.height), g = c.getContext('2d'); g.setTransform(K, 0, 0, K, -view.x0 * K, -view.y0 * K); drawEnd(g, 1); A.end_card = { c, ax: c.width / 2, ay: c.height / 2 }; }
+  mark('assets-done');
   return A;
 }
 function layerName(id, zh) { if (id === 'hand') return zh ? '手指' : 'Hand'; if (id === 'end_card') return zh ? '结束页' : 'End card'; const i = +id.split('_')[1], c = L.rings[i] ? L.rings[i].c : ''; return (zh ? '环_' : 'Ring_') + (i + 1) + '_' + (zh ? (COLOR_ZH[c] || c) : c); }
@@ -374,10 +398,13 @@ async function doExportAE(save = true, r0 = curRec()) { if (!r0) { toast('请先
 // ---------- 3D 导出（glTF：每个环一个节点，扣子为子节点；动画 = 记录的位置/旋转/缩放）----------
 async function doExport3D() {
   const r0 = curRec(); if (!r0) { toast('请先用“● 开始记录”记录一段'); return null; }
+  const t3 = performance.now(), prof = (window.__aeProf = window.__aeProf || []), mark = k => prof.push([k, +(performance.now() - t3).toFixed(1)]);
   status('正在生成 glTF…');
   const THREE = await import('three'); const { GLTFExporter } = await import('three/examples/jsm/exporters/GLTFExporter.js');
+  mark('3d-imports');
   const fps = +S.export3dFps || 30, scene = new THREE.Scene(), tracks = [], u = 0.01; // 1px = 1cm
   S3.build(L, geoS());
+  mark('3d-build');
   const nodes = S3.groups.map((g0, i) => { const g = g0.clone(true); g.name = 'Ring_' + (i + 1) + '_' + L.rings[i].c; g.traverse(o => { if (o.isMesh && o !== g) o.name = g.name + '_part'; }); g.position.set(L.rings[i].x * u, -L.rings[i].y * u, 0); g.scale.setScalar(u); g.rotation.set(0, 0, 0); scene.add(g); return g; });
   for (const [id, tr] of r0.tracks) {
     if (!id.startsWith('ring_')) continue; const i = +id.split('_')[1], n = nodes[i]; if (!n) continue;
@@ -389,10 +416,12 @@ async function doExport3D() {
   }
   const clip = new THREE.AnimationClip('RingUntangle', -1, tracks);
   const cam = new THREE.OrthographicCamera(-DW / 2 * u, DW / 2 * u, DH / 2 * u, -DH / 2 * u, 0.1, 100); cam.name = 'Camera'; cam.position.set(DW / 2 * u, -DH / 2 * u, 20); scene.add(cam);
+  mark('3d-tracks');
   const glb = await new Promise((res, rej) => new GLTFExporter().parse(scene, res, rej, { binary: true, animations: [clip] }));
+  mark('3d-gltf');
   const enc = new TextEncoder(), meta = { tool: APP_ID, format: 'export3d/1', fps, duration: r0.lastT, frames: Math.ceil(r0.lastT * fps), width: DW, height: DH, units: '1 px = 1 cm（Y 向上，场景在 XY 平面，相机沿 -Z 看）', nodes: nodes.map(n => n.name), level: { rings: L.rings, clips: L.clips }, note: '透明度淡出在 glTF 里用缩放→0 表示（glTF 不支持材质透明度动画）' };
   const files = [{ name: 'scene.glb', data: new Uint8Array(glb) }, { name: 'scene3d.json', data: enc.encode(JSON.stringify(meta, null, 1)) }, { name: 'README_3D.md', data: enc.encode('# 解环 · 3D 动画导出\n\n- `scene.glb`：glTF 2.0（Blender / UE5 / C4D 直接导入），每个环一个节点（扣子是子网格），动画名 RingUntangle。\n- `scene3d.json`：帧率、时长、关卡数据。\n- 本版本仅导出 glTF（未生成 FBX / blender_import.py）。\n') }];
-  const blob = makeZip(files), name = `ring-untangle-tool_3d_export_${stampNow()}.zip`; download(blob, name); window.__3dLast = { name, size: blob.size, tracks: tracks.length }; status(`3D 导出：${nodes.length} 个节点，${tracks.length} 条动画轨道`); return window.__3dLast;
+  const blob = makeZip(files), name = `ring-untangle-tool_3d_export_${stampNow()}.zip`; download(blob, name); window.__3dLast = { name, size: blob.size, tracks: tracks.length }; mark('3d-zip'); status(`3D 导出：${nodes.length} 个节点，${tracks.length} 条动画轨道`); return window.__3dLast;
 }
 async function doExportH5() { try { return await exportH5PlayableFromPage({ toolId: APP_ID, S, stripDataUrls: [DEFAULT_HAND], status, toast }); } catch (e) { status('H5 导出失败：' + e.message); console.error(e); return null; } }
 const PANEL_ACTIONS = { reseed: () => reseed(), aeToggle: () => aeActive() ? aeStopAndExport() : recStart(), aeExport: () => doExportAE(), export3d: () => doExport3D(), exportH5: () => doExportH5(), levelEdit: openEditor, levelCheck, levelExport, levelImport, levelRef };
