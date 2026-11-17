@@ -469,3 +469,6 @@ window.__game = {
   doExportAE, doExport3D, doExportH5, aeStart: () => recStart(), aeStop: () => aeStop(), aeActive: () => aeActive(), startRec, stopRec, get mediaRec() { return rec; }, migrate, APP_ID, APP_VERSION,
 };
 buildPanel(); loadHand(); newGame(); window.__ready = true; requestAnimationFrame(loop);
+
+import { installPanelUI } from './panel-ui.js';
+installPanelUI({ openKey: 'ringUntangleTool.panelOpen.v1' });
