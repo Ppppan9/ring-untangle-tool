@@ -46,7 +46,7 @@ function newGame(lv = null) {
   { const h0 = LT() ? LETTER_HAND0 : REF_HAND0; hand.x = h0.x; hand.y = h0.y; } window.__finished = false; finishStopT = null;
   const sv = solveLevel(level, S.gripLimit); G.solvable = sv.solvable;
   status(`v${APP_VERSION} · ${level.name || '自定义关卡'} · ${level.rings.length} 个环 · ${level.clips.length} 个扣 · ${sv.solvable ? '可全部解开' : `⚠ 不可解（${sv.stuck.length} 个环卡死）`}`);
-  try { S3.build(L, geoS()); makeAssets(); } catch (e) { _aeAssets = null; _aeAssetsKey = ''; }
+  try { S3.build(L, geoS()); if (!(_aeAssets && _aeAssetsKey === aeAssetsKey())) makeAssets(); } catch (e) { _aeAssets = null; _aeAssetsKey = ''; }
 }
 const ended = () => !!(G && G.winT != null);
 
@@ -346,14 +346,33 @@ function sceneItems() {
 }
 let _aeAssets = null, _aeAssetsKey = '';
 function aeAssetsKey() {
-  return [S3.key, cv.width, cv.height, S.ssaa, K, view && view.x0, view && view.y0, view && view.w, view && view.h, S.shadowBlur, S.shadowAlpha, S.shadowDX, S.shadowDY, S.shadowColor, S.bgTop, S.bgBottom, S.titleShow, S.titleText, S.titleY, S.titleH, S.titleSize, S.titleBar, S.titleColor, !!hand.img, S.handFlip, S.handAnchorX, S.handAnchorY, S.letterStyle, S.candyShA, S.candyShBlur].join('|');
+  const lv = L || {};
+  return JSON.stringify({
+    rings: (lv.rings || []).map(r => [r.c, r.x, r.y, r.gap, r.ch, r.rot, r.h, r.sx]),
+    clips: (lv.clips || []).map(c => [c.o, c.g, c.x, c.y, c.rx, c.ry]),
+    theme: lv.theme, word: lv.word,
+    canvas: [cv.width, cv.height, S.ssaa, K, view && view.x0, view && view.y0, view && view.w, view && view.h],
+    look: [S.shadowBlur, S.shadowAlpha, S.shadowDX, S.shadowDY, S.shadowColor, S.bgTop, S.bgBottom, S.titleShow, S.titleText, S.titleY, S.titleH, S.titleSize, S.titleBar, S.titleColor, S.letterStyle, S.candyShA, S.candyShBlur, S.ringR, S.tubeR, S.clipSize, S.boardScale, S.boardX, S.boardY, S.handFlip, S.handAnchorX, S.handAnchorY],
+    hand: !!hand.img
+  });
+}
+function aePatchHand(A) {
+  if (!hand.img) { delete A.hand; return A; }
+  const s = handScaleOf() * K, w = hand.img.width * s, h = hand.img.height * s, c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(w)); c.height = Math.max(1, Math.round(h));
+  const g = c.getContext('2d'); if (S.handFlip) { g.translate(c.width, 0); g.scale(-1, 1); } g.drawImage(hand.img, 0, 0, c.width, c.height);
+  A.hand = { c, ax: S.handFlip ? (1 - S.handAnchorX) * c.width : S.handAnchorX * c.width, ay: S.handAnchorY * c.height };
+  return A;
 }
 function makeAssets() {
   const t0 = performance.now(), prof = (window.__aeProf = window.__aeProf || []);
   const mark = (k) => prof.push([k, +(performance.now() - t0).toFixed(1)]);
-  // 关卡未变时复用精灵，避免自动通关数分钟后再次 3D 渲染（长会话下 WebGL 可能极慢）
+  // 关卡/画面未变时复用精灵。不要把 S3.key 算进缓存键（build 的 key 含整个 rings 对象，容易误判 miss，长会话后再 3D 渲染会超过数分钟）。
   const key = aeAssetsKey();
   if (_aeAssets && _aeAssetsKey === key) { mark('assets-cache'); return _aeAssets; }
+  if (_aeAssets && _aeAssetsKey && _aeAssetsKey.replace(/"hand":true/g, '"hand":false') === key.replace(/"hand":true/g, '"hand":false')) {
+    aePatchHand(_aeAssets); _aeAssetsKey = key; mark('assets-cache-hand'); return _aeAssets;
+  }
   const A = {}, mk = (w, h) => { const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w)); c.height = Math.max(1, Math.round(h)); return c; };
   { const c = mk(cv.width, cv.height), g = c.getContext('2d'), sv = ctx; void sv; const gr = g.createLinearGradient(0, 0, 0, c.height); gr.addColorStop(0, S.bgTop); gr.addColorStop(1, S.bgBottom); g.fillStyle = gr; g.fillRect(0, 0, c.width, c.height); drawGrain(g, c.width, c.height); A.background = { c, ax: 0, ay: 0 }; }
   if (S.titleShow) { const c = mk(cv.width, cv.height), g = c.getContext('2d'); g.setTransform(K, 0, 0, K, -view.x0 * K, -view.y0 * K); g.fillStyle = S.titleBar; g.fillRect(view.x0 - 2, S.titleY, view.w + 4, S.titleH); g.fillStyle = S.titleColor; g.font = `900 ${S.titleSize}px "Arial Black","Noto Sans CJK SC",sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.translate(DW / 2, S.titleY + S.titleH / 2 + S.titleSize * 0.04 + (S.titleDY || 0)); g.scale(S.titleSX || 1, 1); g.fillText(S.titleText, 0, 0); A.title = { c, ax: 0, ay: 0 }; }
@@ -500,6 +519,19 @@ const __h5 = applyPlayableMode({
   onResize: () => { },
 });
 if (!__h5) bindEditorDevicePreview(() => S);
+window.__aeDebug = () => {
+  const rec = (aeRec && aeRec.rec) || aeLastRec;
+  const info = S3.renderer && S3.renderer.info;
+  let meshes = 0, geos = 0, mats = 0;
+  if (S3.scene) S3.scene.traverse(o => { if (o.isMesh) meshes++; if (o.geometry) geos++; if (o.material) mats += Array.isArray(o.material) ? o.material.length : 1; });
+  const tFirstLast = rec && [...rec.tracks.values()].map(tr => tr.s.length ? [tr.id, tr.s.length, tr.s[0][0], tr.s[tr.s.length - 1][0]] : [tr.id, 0]);
+  return {
+    cache: { has: !!_aeAssets, same: !!(_aeAssets && _aeAssetsKey === aeAssetsKey()), storedLen: (_aeAssetsKey || '').length, nowLen: aeAssetsKey().length, stored: (_aeAssetsKey || '').slice(0, 180), now: aeAssetsKey().slice(0, 180) },
+    rec: rec ? { frames: rec.frames, lastT: rec.lastT, tracks: rec.tracks.size, sfx: rec.sfx.length, t0: rec.t0, tracksT: tFirstLast } : null,
+    recClosed, aeActive: aeActive(),
+    s3: { groups: S3.groups.length, keyLen: (S3.key || '').length, envKey: S3.envKey, meshes, geos, mats, info: info ? { mem: { ...info.memory }, programs: info.programs && info.programs.length, render: { ...info.render } } : null }
+  };
+};
 window.__game = {
   renderAt: t => { window.__vclock = t; frameTick(t); },
   get G() { return G; }, get S() { return S; }, get L() { return L; }, get view() { return view; }, get hand() { return hand; }, get auto() { return auto; }, get editor() { return editor; },

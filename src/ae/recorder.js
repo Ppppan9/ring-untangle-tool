@@ -9,7 +9,12 @@ export function createAERecorder(api) {
   function start() { const E = api.env(); R = { t0: api.now(), lastT: 0, frames: 0, tracks: new Map(), sfx: [], L: E.L, S: { ...E.S } }; api.sfx.hook = name => { if (R) R.sfx.push({ t: Math.max(0, (api.now() - R.t0) / 1000), name }); }; }
   function stop() { const r = R; R = null; return r; }
   function sample(now) {
-    if (!R) return; const E = api.env(); if (E.L !== R.L) { R = null; return; }
+    if (!R) return; const E = api.env();
+    // 自动通关会 newGame() 换掉 L 引用。若环数相同则续录，不要把记录丢掉（否则 cap/导出只剩更早的空记录）。
+    if (E.L !== R.L) {
+      if (E.L && R.L && E.L.rings && R.L.rings && E.L.rings.length === R.L.rings.length) R.L = E.L;
+      else { R = null; return; }
+    }
     // If the clock jumps (tests set __vclock after 开始记录, or now() switches from wall to virtual),
     // rebase t0 so lastT stays the real content length. Otherwise D becomes hundreds of seconds and export hangs.
     const elapsedMs = now - R.t0, expectedMs = R.lastT * 1000;
