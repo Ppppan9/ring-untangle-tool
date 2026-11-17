@@ -343,9 +343,16 @@ function sceneItems() {
   const ea = endAlpha(); if (ea > 0) items.push({ id: 'end_card', asset: 'end_card', x: cv.width / 2, y: cv.height / 2, sc: 1, rot: 0, op: ea, z: 900 });
   return items;
 }
+let _aeAssets = null, _aeAssetsKey = '';
+function aeAssetsKey() {
+  return [S3.key, cv.width, cv.height, S.ssaa, K, view && view.x0, view && view.y0, view && view.w, view && view.h, S.shadowBlur, S.shadowAlpha, S.shadowDX, S.shadowDY, S.shadowColor, S.bgTop, S.bgBottom, S.titleShow, S.titleText, S.titleY, S.titleH, S.titleSize, S.titleBar, S.titleColor, !!hand.img, S.handFlip, S.handAnchorX, S.handAnchorY, S.letterStyle, S.candyShA, S.candyShBlur].join('|');
+}
 function makeAssets() {
   const t0 = performance.now(), prof = (window.__aeProf = window.__aeProf || []);
   const mark = (k) => prof.push([k, +(performance.now() - t0).toFixed(1)]);
+  // 关卡未变时复用精灵，避免自动通关数分钟后再次 3D 渲染（长会话下 WebGL 可能极慢）
+  const key = aeAssetsKey();
+  if (_aeAssets && _aeAssetsKey === key) { mark('assets-cache'); return _aeAssets; }
   const A = {}, mk = (w, h) => { const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w)); c.height = Math.max(1, Math.round(h)); return c; };
   { const c = mk(cv.width, cv.height), g = c.getContext('2d'), sv = ctx; void sv; const gr = g.createLinearGradient(0, 0, 0, c.height); gr.addColorStop(0, S.bgTop); gr.addColorStop(1, S.bgBottom); g.fillStyle = gr; g.fillRect(0, 0, c.width, c.height); drawGrain(g, c.width, c.height); A.background = { c, ax: 0, ay: 0 }; }
   if (S.titleShow) { const c = mk(cv.width, cv.height), g = c.getContext('2d'); g.setTransform(K, 0, 0, K, -view.x0 * K, -view.y0 * K); g.fillStyle = S.titleBar; g.fillRect(view.x0 - 2, S.titleY, view.w + 4, S.titleH); g.fillStyle = S.titleColor; g.font = `900 ${S.titleSize}px "Arial Black","Noto Sans CJK SC",sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.translate(DW / 2, S.titleY + S.titleH / 2 + S.titleSize * 0.04 + (S.titleDY || 0)); g.scale(S.titleSX || 1, 1); g.fillText(S.titleText, 0, 0); A.title = { c, ax: 0, ay: 0 }; }
@@ -382,6 +389,7 @@ function makeAssets() {
   if (hand.img) { const s = handScaleOf() * K, w = hand.img.width * s, h = hand.img.height * s, c = mk(w, h), g = c.getContext('2d'); if (S.handFlip) { g.translate(w, 0); g.scale(-1, 1); } g.drawImage(hand.img, 0, 0, w, h); A.hand = { c, ax: S.handFlip ? (1 - S.handAnchorX) * w : S.handAnchorX * w, ay: S.handAnchorY * h }; }
   { const c = mk(cv.width, cv.height), g = c.getContext('2d'); g.setTransform(K, 0, 0, K, -view.x0 * K, -view.y0 * K); drawEnd(g, 1); A.end_card = { c, ax: c.width / 2, ay: c.height / 2 }; }
   mark('assets-done');
+  _aeAssets = A; _aeAssetsKey = key;
   return A;
 }
 function layerName(id, zh) { if (id === 'hand') return zh ? '手指' : 'Hand'; if (id === 'end_card') return zh ? '结束页' : 'End card'; const i = +id.split('_')[1], c = L.rings[i] ? L.rings[i].c : ''; return (zh ? '环_' : 'Ring_') + (i + 1) + '_' + (zh ? (COLOR_ZH[c] || c) : c); }
