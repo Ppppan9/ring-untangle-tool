@@ -253,7 +253,7 @@ export const GROUPS = [
     ['h5DeviceH', '预览高度(px)', 'range', 844, 400, 2560, 1],
     ['h5CtaText', 'CTA 按钮文案', 'text', '立即下载'],
     ['h5StoreUrl', '应用商店 / 落地页 URL', 'text', 'https://play.google.com/store/apps/details?id=com.example.game'],
-    ['h5GameName', '游戏名（可选）', 'text', '解环大师'],
+    ['h5GameName', '游戏名（可选）', 'text', '解环'],
     ['h5Icon', '应用图标（可选，透明PNG）', 'file', ''],
     ['h5MaxMb', '体积告警阈值(MB)', 'range', 5, 1, 20, 0.5],
     ['h5AutoPlay', '打开试玩后自动通关演示', 'bool', false],
@@ -278,6 +278,9 @@ export function migrate(obj) {
   if (s.letterModel && !('letterStyle' in s)) { if (s.letterModel === 'thickSleeve') { s.letterStyle = 'thick'; s.connStyle = 'collar'; } delete s.letterModel; } // v13：模型风格拆分为 字母风格 × 连接件风格
   const out = { ...DEFS };
   for (const k in DEFS) if (k in s && typeof s[k] === typeof DEFS[k]) out[k] = s[k];
+  // 始终把旧默认游戏名里的「大师」后缀换成中性名（不升 SETTINGS_VERSION）
+  const oldName = '解环' + '大师';
+  if (out.h5GameName === oldName) out.h5GameName = '解环';
   return out;
 }
 export function loadSettings() { try { const raw = localStorage.getItem(STORE_KEY); if (raw) return migrate(JSON.parse(raw)); } catch (e) { } return { ...DEFS }; }
